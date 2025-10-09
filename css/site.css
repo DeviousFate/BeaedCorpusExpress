@@ -1,0 +1,51 @@
+:root{
+  --bg:#0b0d10; --panel:#12161c; --ink:#e8eef7; --muted:#98a2b3; --brand:#64b5f6; --accent:#22d3ee; --danger:#ef4444;
+  --card:#171b22; --border:#242a34; --success:#10b981;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0; font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji','Segoe UI Emoji';
+  background:linear-gradient(180deg,#0b0d10 0%, #0e1217 100%); color:var(--ink);}
+a{color:inherit}
+.container{max-width:1200px; margin:0 auto; padding:24px}
+header{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 0}
+.brand{display:flex; align-items:center; gap:12px}
+.brand__logo{width:40px; height:40px; border-radius:12px; background:radial-gradient(circle at 30% 30%, var(--accent), var(--brand)); box-shadow:0 4px 24px rgba(34,211,238,.35)}
+.brand__name{font-weight:700; letter-spacing:.25px}
+nav ul{display:flex; list-style:none; gap:16px; padding:0; margin:0}
+.pill{background:var(--panel); border:1px solid var(--border); padding:8px 12px; border-radius:999px; color:var(--muted)}
+.hero{display:grid; grid-template-columns:1.1fr .9fr; gap:24px; align-items:center; margin-top:8px}
+.hero .card{padding:24px}
+.card{background:var(--card); border:1px solid var(--border); border-radius:16px; box-shadow:0 4px 20px rgba(0,0,0,.25)}
+.headline{font-size:clamp(24px, 3.4vw, 40px); font-weight:700; line-height:1.1; margin:0}
+.sub{color:var(--muted); margin-top:8px}
+.grid{display:grid; gap:16px}
+.grid.cols-3{grid-template-columns:repeat(3, minmax(0,1fr))}
+.grid.cols-2{grid-template-columns:repeat(2, minmax(0,1fr))}
+@media (max-width: 980px){
+  .hero{grid-template-columns:1fr}
+  .grid.cols-3{grid-template-columns:1fr 1fr}
+}
+@media (max-width: 640px){
+  .grid.cols-3, .grid.cols-2{grid-template-columns:1fr}
+}
+.formats .format-card{cursor:pointer; user-select:none; padding:16px; display:flex; gap:16px; align-items:center; transition:.15s transform ease}
+.formats .format-card:hover{transform:translateY(-2px)}
+.badge{display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid var(--border); background:var(--panel); color:var(--muted)}
+.preview-wrap{background:linear-gradient(180deg,#0d1117, #0b0f14); border-radius:14px; padding:16px; border:1px dashed #2a3340}
+.actions{display:flex; gap:12px; flex-wrap:wrap}
+button, .btn{appearance:none; border:none; background:var(--brand); color:#06131f; font-weight:700; padding:10px 14px; border-radius:10px; cursor:pointer}
+.btn.secondary{background:transparent; border:1px solid var(--border); color:var(--ink)}
+.stack{display:flex; flex-direction:column; gap:10px}
+.row{display:flex; gap:10px; flex-wrap:wrap}
+label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px}
+input[type="text"], input[type="number"], select, textarea{
+  width:100%; background:#0e141b; color:var(--ink); border:1px solid var(--border); padding:10px 12px; border-radius:10px; outline:none
+}
+textarea{min-height:80px; resize:vertical}
+.small{font-size:12px; color:var(--muted)}
+.price{font-weight:800; font-size:22px}
+.divider{height:1px; background:var(--border); margin:8px 0 16px}
+.footer{margin:32px 0 24px; color:var(--muted); font-size:14px}
+.mono{font-family:'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace}
+.title{font-weight:700}
