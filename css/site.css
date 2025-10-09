@@ -131,20 +131,3 @@ textarea{ min-height:80px; resize:vertical }
   .actions{ flex-direction:column }
   .actions .btn{ width:100% }
 }
-/* ========== Dark mode (optional) ========== */
-@media (prefers-color-scheme: dark){
-  :root{
-    --bg:#0b0d10;           /* page background */
-    --surface:#12161c;      /* panels/nav */
-    --card:#171b22;         /* cards */
-    --border:#242a34;       /* subtle borders */
-    --ink:#e9eef5;          /* default text (bright) */
-    --ink-muted:#cbd5e1;    /* helper / secondary text */
-    --ink-soft:#a8b3c6;     /* labels */
-    --headline:#ffffff;     /* big headings */
-    --brand:#64b5f6;        /* primary buttons/accents */
-    --accent:#22d3ee;       /* decorative accent */
-    --danger:#ef4444;
-    --success:#10b981;
-  }
-}

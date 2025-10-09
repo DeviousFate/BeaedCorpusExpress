@@ -12,11 +12,23 @@ const PRICING = {
   perLineOver1: 0.20,
 };
 
+// OSHA/ANSI-inspired color presets
+const SIGN_TYPES = {
+  custom:   { top: null,       core: null,       text: "auto" }, // no change
+  high_voltage: { top: "#f5d009", core: "#000000", text: "auto" }, // yellow / black
+  danger:   { top: "#c1121f", core: "#ffffff", text: "auto" },    // red / white
+  warning:  { top: "#f97316", core: "#000000", text: "auto" },    // orange / black
+  caution:  { top: "#f5d009", core: "#000000", text: "auto" },    // yellow / black
+  notice:   { top: "#2563eb", core: "#ffffff", text: "auto" },    // blue / white
+};
+
+
 // State
 const state = {
   formatId: FORMATS[0].id,
   line1: "PUMP 12",
   line2: "480V",
+  signType: "custom",
   font: "Inter, sans-serif",
   textCase: "upper",
   topColor: "#ffffff",
@@ -129,6 +141,17 @@ function escapeHTML(str){
 
 // Bind controls
 function bindControls(){
+
+  // Sign Type preset -> applies suggested colors, user can override afterward
+  $("#signType").addEventListener("change", (e) => {
+    state.signType = e.target.value;
+    const p = SIGN_TYPES[state.signType] || SIGN_TYPES.custom;
+    if (p.top)  state.topColor  = p.top;
+    if (p.core) state.coreColor = p.core;
+    if (p.text) state.textColor = p.text; // "auto" uses core color
+    updateAll();
+  });
+ 
   // Text
   ["line1","line2"].forEach(id=> $("#"+id).addEventListener('input', e=>{ state[id] = e.target.value; updateAll(); }));
   $("#fontFamily").addEventListener('change', e=>{ state.font = e.target.value; updateAll(); });
@@ -190,7 +213,7 @@ function buildPayload(){
     options: {
       text: { line1: state.line1, line2: state.line2, font: state.font, case: state.textCase },
       colors: { top: state.topColor, core: state.coreColor, text: state.textColor },
-      features: { hole: state.hole, adhesive: state.adhesive, thickness_mm: state.thickness },
+      features: { hole: state.hole, adhesive: state.adhesive, thickness_mm: state.thickness }, sign_type: state.signType,
     },
     quantity: parseInt(state.qty,10)||1,
     estimate_total: Number(estimatePrice().toFixed(2))
@@ -205,6 +228,7 @@ function buildMailto(payload){
   const lines = [];
   lines.push(`Format: ${payload.format.label} [${payload.format.id}]`);
   lines.push(`Qty: ${payload.quantity}`);
+  lines.push(`Sign Type: ${payload.options.sign_type}`);
   lines.push(`Text: "${payload.options.text.line1}"${payload.options.text.line2? ` / "${payload.options.text.line2}"`:''}`);
   lines.push(`Font: ${payload.options.text.font} | Case: ${payload.options.text.case}`);
   lines.push(`Colors: Top ${payload.options.colors.top}, Core ${payload.options.colors.core}, Text ${payload.options.colors.text}`);
@@ -239,6 +263,7 @@ function updateAll(){
   // Bind state to controls
   $("#line1").value = state.line1 || "";
   $("#line2").value = state.line2 || "";
+  $("#signType").value = state.signType;
   $("#fontFamily").value = state.font;
   $("#textCase").value = state.textCase;
   $("#topColor").value = state.topColor;
