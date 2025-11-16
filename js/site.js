@@ -1,9 +1,9 @@
 // --- Data: default formats (extendable) ---
+// Formats replaced with customer specifications
 const FORMATS = [
-  { id:"circle-2in", label:"Circle — 2.00\"", shape:"circle", diameter:2.00, viewBox:[0,0,300,300], hole:"h0125", basePrice:3.50 },
-  { id:"rect-3x1p5", label:"Rectangle — 3.00×1.50\"", shape:"rect", w:3.00, h:1.50, viewBox:[0,0,360,180], hole:"none", basePrice:4.25 },
-  { id:"rect-2x1", label:"Rectangle — 2.00×1.00\"", shape:"rect", w:2.00, h:1.00, viewBox:[0,0,300,150], hole:"none", basePrice:3.00 }
+  { id: "rect-5x3", label: "Rectangle — 5.00×3.00\"", shape: "rect", w: 5.00, h: 3.00, viewBox: [0,0,500,300], hole: "none", basePrice: 4.25 }
 ];
+
 
 // Simple pricing estimator
 const PRICING = {
@@ -12,16 +12,44 @@ const PRICING = {
   perLineOver1: 0.20,
 };
 
+function normalizePacks(n){
+  const qty = parseInt(n, 10) || 25;
+  return Math.max(25, Math.ceil(qty / 25) * 25); // rounds up to nearest 25
+}
+
+// Updated estimate to use packs
+function estimatePrice(){
+  const base = PRICING.basePerFormat(state.formatId);
+  const chars = (state.line1?.length||0) + (state.line2?.length||0);
+  const lines = (state.line1?1:0) + (state.line2?1:0);
+  const extraLines = Math.max(0, lines-1);
+
+  let qty = parseInt(state.qty,10) || 25;
+  if (qty < 25) qty = 25;
+  // round up to nearest 25:
+  qty = Math.ceil(qty / 25) * 25;
+  state.qty = qty; // keep UI in sync
+
+  const estEach = base + chars*PRICING.perChar + extraLines*PRICING.perLineOver1;
+  return estEach * qty;
+}
+
+
 // OSHA/ANSI-inspired color presets
 const SIGN_TYPES = {
   custom:   { top: null,       core: null,       text: "auto" }, // no change
-  high_voltage: { top: "#f5d009", core: "#000000", text: "auto" }, // yellow / black
-  danger:   { top: "#c1121f", core: "#ffffff", text: "auto" },    // red / white
-  warning:  { top: "#f97316", core: "#000000", text: "auto" },    // orange / black
-  caution:  { top: "#f5d009", core: "#000000", text: "auto" },    // yellow / black
-  notice:   { top: "#2563eb", core: "#ffffff", text: "auto" },    // blue / white
+  high_voltage:   "assets/phenolic/High_Voltage.jpg",        
+  danger:         "assets/phenolic//Danger.jpg",
+  warning:        "assets/phenolic/Warning.jpg",
+  caution:        "assets/phenolic/Caution.jpg",
+  notice:         "assets/phenolic/Notice.jpg",
 };
 
+// Map signType -> image path inside /assets/tags
+function imageForSignType(signType) {
+  const key = signType && signType !== "custom" ? signType : "custom";
+  return `assets/tags/3x5_${key}.png`; // change to .svg if you have SVG
+}
 
 // State
 const state = {
@@ -97,10 +125,48 @@ function previewThumbSVG(f){
   return `<svg width="64" height="40" viewBox="0 0 64 40" aria-hidden="true"><rect x="2" y="6" width="60" height="28" rx="4" fill="${state.topColor}" stroke="#1f2937"/></svg>`;
 }
 
+/*function renderPreview(){
+  const img = document.getElementById("tagPreviewImg");
+  // choose based on signType; fallback to custom if missing
+  const src = imageForSignType(state.signType);
+  img.src = src;
+  img.alt = `3x5 ${state.signType || "custom"} phenolic tag preview`;
+  }
+*/
+
 function renderPreview(){
-  const svg = $("#tagPreview");
+  const svg = document.getElementById("tagPreview");
   const f = fmt();
+  const imagePath = SIGN_IMAGES[state.signType];
+
+  if (imagePath) {
+    // Uses an <image> element to show the asset file in the SVG canvas
+    svg.setAttribute("viewBox", "0 0 300 180"); // 5:3 aspect ratio-ish
+    svg.innerHTML = `
+      <image href="${imagePath}"
+             x="0" y="0" width="300" height="180"
+             preserveAspectRatio="xMidYMid slice" />
+    `;
+    return;
+  }
+
+  // Fallback to dynamic SVG rendering if no asset image is found
   const textColor = state.textColor === 'auto' ? state.coreColor : state.textColor;
+
+  let content = "";
+  if (f.shape === 'circle') {
+    const vb = f.viewBox; svg.setAttribute('viewBox', vb.join(' '));
+    content += `<circle cx="150" cy="150" r="120" fill="${state.topColor}" stroke="#1f2937" stroke-width="2"/>`;
+    if(state.hole !== 'none') content += `<circle cx="150" cy="44" r="8" fill="#0b0f14" stroke="#1f2937"/>`;
+    content += drawTextStack(150, 160, textColor, true);
+  } else {
+    const vb = f.viewBox; svg.setAttribute('viewBox', vb.join(' '));
+    const rx = 14;
+    content += `<rect x="8" y="8" width="${vb[2]-16}" height="${vb[3]-16}" rx="${rx}" fill="${state.topColor}" stroke="#1f2937" stroke-width="2"/>`;
+    content += drawTextStack(vb[2]/2, vb[3]/2+5, textColor, false);
+  }
+  svg.innerHTML = content;
+}
 
   let content = "";
   if(f.shape === 'circle'){
@@ -133,7 +199,7 @@ function renderPreview(){
       return outlineEl + `<text x="${cx}" y="${y}" text-anchor="${anchor}" style="${base} font-size:${size}px" fill="${fill}">${escapeHTML(t)}</text>`;
     }).join("");
   }
-}
+
 
 function escapeHTML(str){
   return str.replace(/[&<>\"']/g, (m)=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
@@ -163,6 +229,14 @@ function bindControls(){
   $("#textColor").addEventListener('change', e=>{ state.textColor = e.target.value; updateAll(); });
   $("#outline").addEventListener('change', e=>{ state.outline = e.target.value; updateAll(); });
 
+function toggleColorControls(){
+  const locked = state.signType !== "custom";
+  document.querySelectorAll("#topColor, #coreColor, #textColor").forEach(el => {
+    el.disabled = locked;
+  });
+}
+
+
   // Format opts
   $("#formatSelect").addEventListener('change', e=>{ state.formatId = e.target.value; updateAll(); });
   $("#holeOpt").addEventListener('change', e=>{ state.hole = e.target.value; updateAll(); });
@@ -170,7 +244,11 @@ function bindControls(){
   $("#thickness").addEventListener('change', e=>{ state.thickness = e.target.value; updateAll(); });
 
   // Qty
-  $("#qty").addEventListener('input', e=>{ state.qty = e.target.value; updateAll(); });
+$("#qty").addEventListener('input', e=>{
+  state.qty = normalizePacks(e.target.value);
+  $("#qty").value = state.qty; // reflect normalization
+  updateAll();
+});
 
   // Reset
   $("#resetBtn").addEventListener('click', ()=>{
@@ -208,19 +286,23 @@ function bindControls(){
 
 function buildPayload(){
   const f = fmt();
+  const q = normalizePacks(state.qty);
   const spec = {
     format: f,
     options: {
       text: { line1: state.line1, line2: state.line2, font: state.font, case: state.textCase },
       colors: { top: state.topColor, core: state.coreColor, text: state.textColor },
-      features: { hole: state.hole, adhesive: state.adhesive, thickness_mm: state.thickness }, sign_type: state.signType,
+      features: { hole: state.hole, adhesive: state.adhesive, thickness_mm: state.thickness },
+      sign_type: state.signType
     },
-    quantity: parseInt(state.qty,10)||1,
-    estimate_total: Number(estimatePrice().toFixed(2))
+    quantity: q,
+    estimate_total: Number(estimatePrice().toFixed(2)),
+    preview_image: imageForSignType(state.signType)
   };
   $("#configJson").value = JSON.stringify(spec);
   return spec;
 }
+
 
 function buildMailto(payload){
   const to = "quotes@example.com"; // TODO: replace with your address or service endpoint
@@ -229,6 +311,7 @@ function buildMailto(payload){
   lines.push(`Format: ${payload.format.label} [${payload.format.id}]`);
   lines.push(`Qty: ${payload.quantity}`);
   lines.push(`Sign Type: ${payload.options.sign_type}`);
+  lines.push(`Preview Image: ${payload.preview_image}`);
   lines.push(`Text: "${payload.options.text.line1}"${payload.options.text.line2? ` / "${payload.options.text.line2}"`:''}`);
   lines.push(`Font: ${payload.options.text.font} | Case: ${payload.options.text.case}`);
   lines.push(`Colors: Top ${payload.options.colors.top}, Core ${payload.options.colors.core}, Text ${payload.options.colors.text}`);
@@ -275,12 +358,20 @@ function updateAll(){
   $("#adhesiveOpt").value = state.adhesive;
   $("#thickness").value = state.thickness;
   $("#qty").value = state.qty;
+  toggleColorControls(); // disable color pickers if preset selected
 
   $("#currentFormatLabel").textContent = FORMATS.find(f=>f.id===state.formatId)?.label || "—";
   $("#priceEstimate").textContent = `$${estimatePrice().toFixed(2)}`;
 
   renderPreview();
   persistToHash();
+}
+
+const PRELOAD = ["custom","high_voltage","danger","warning","caution","notice"]
+  .map(k => imageForSignType(k));
+
+function preloadImages() {
+  PRELOAD.forEach(src => { const i = new Image(); i.src = src; });
 }
 
 // Init

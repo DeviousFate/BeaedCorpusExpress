@@ -42,7 +42,9 @@
         <div class="stack">
           <div class="title">Live Preview</div>
           <div class="preview-wrap">
-            <svg id="tagPreview" viewBox="0 0 300 200" role="img" aria-label="Tag preview" style="width:100%;height:auto;display:block"></svg>
+          <!--  <svg id="tagPreview" viewBox="0 0 300 200" role="img" aria-label="Tag preview" style="width:100%;height:auto;display:block"></svg> -->
+          <!-- replaced as assets are now added -->
+            <img id="tagPreviewImg" alt="Tag preview" style="width:100%;height:auto;display:block;aspect-ratio:5/3;object-fit:contain;">
           </div>
           <div class="row" aria-live="polite">
             <div class="pill">Current: <span id="currentFormatLabel" class="mono"></span></div>
@@ -210,7 +212,8 @@
                 </div>
                 <div style="flex:1">
                   <label for="qty">Quantity</label>
-                  <input id="qty" name="qty" type="number" min="1" value="10" required />
+                  <input id="qty" name="qty" type="number" min="25" step="25" value="25" required />
+                  <div class="small">Minimum order: packs of 25 (25, 50, 75, ...)</div>
                 </div>
               </div>
               <input type="hidden" id="configJson" name="configJson" />

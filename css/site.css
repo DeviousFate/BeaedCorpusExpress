@@ -154,7 +154,15 @@ textarea{ min-height:80px; resize:vertical }
   background: linear-gradient(180deg,#0d1117, #0b0f14);
   border-radius:14px; padding:12px; border:1px dashed #2a3340;
 }
-#tagPreview{ width:100%; height:auto; }
+#tagPreviewImg{
+  width: 100%;
+  height: auto;
+  display: block;
+  aspect-ratio: 5 / 3;     /* 5:3 landscape matches 3"x5" */
+  object-fit: contain;      /* fit within the preview box */
+  image-rendering: auto;    /* if PNGs are detailed, keep smooth scaling */
+}
+
 
 /* ========== Footer ========== */
 .footer{ margin:32px 0 24px; color:var(--ink-soft); font-size:14px }
