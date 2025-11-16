@@ -31,6 +31,6 @@ The files sent to the Business must be translateable into PDF.
 
 -------------------------------------------
 
-Tentative requirements, likely to be fulfilled by SquareUp POS:
+Tentative requirements, likely to be fulfilled by Stripe POS:
 
 Users must be able to pay online using a portal hosted by the Business.
