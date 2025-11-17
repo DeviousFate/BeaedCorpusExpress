@@ -93,60 +93,56 @@ textarea{ min-height:80px; resize:vertical }
 /* ========== Format cards ========== */
 .formats {
   position: relative;
-  isolation: isolate; /* make a local stacking context so hovered cards can rise */
+  isolation: isolate;              /* own stacking context */
 }
 
 .formats .format-card{
-  position: relative;           /* needed so the absolute badge positions to the card */
-  z-index: 0;
-  overflow: visible;
-
-  display: flex;
-  align-items: center;
-  gap: 16px;
-
   cursor: pointer;
   user-select: none;
-
-  padding: 16px;
-  padding-right: 56px;          /* room for the badge bubble */
-
-  border: 1px solid var(--border);
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 16px 56px 16px 16px;   /* extra room on the right for badge */
+  transition: .15s transform ease;
   border-radius: 14px;
+  border: 1px solid var(--border);
   background: var(--surface);
-  transition: .15s transform ease, box-shadow .15s ease;
+  position: relative;
+  z-index: 0;
+  overflow: visible;
 }
 
 .formats .format-card:hover,
-.formats .format-card:focus-within{
-  z-index: 10;                  /* rise above neighbors */
-  transform: translateY(-2px);
+.formats .format-card:focus-within {
+  z-index: 10;                     /* float above neighbors */
+  transform: translateY(-2px);     /* hover lift */
   box-shadow: 0 8px 24px rgba(0,0,0,.35);
 }
 
-/* Price badge pinned to top-right of card */
-.formats .format-card .badge{
+.formats .format-card .badge {
   position: absolute;
   top: 10px;
   right: 10px;
-  margin-left: 0;               /* override any prior auto margins */
+  margin-left: 0;                  /* overrides old auto */
 }
 
-/* Optional: brighter title inside cards */
-.formats .format-card .title{ color:#e2e8f0; }
+.formats .format-card .title { 
+  color:#e2e8f0;                   /* brighter inside the card */
+}
 
-/* Base badge styling */
 .badge{
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  padding: 4px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--ink-soft);
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:12px;
+  padding:4px 8px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:var(--card);
+  color:var(--ink-soft);
+  margin-left:auto;
 }
+
 
 
 /* ========== Preview ========== */
