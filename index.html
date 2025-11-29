@@ -27,6 +27,86 @@
       </nav>
     </header>
 
+    <!-- Account & Orders -->
+    <section id="account" class="auth-section">
+      <div class="grid cols-2">
+        <div class="card auth-card">
+          <div class="stack">
+            <div class="title">Account Access</div>
+            <p class="small">Sign in to save and revisit quote requests. Orders placed while signed in will be tied to your account.</p>
+            <div class="auth-topline">
+              <div id="authStatus" class="pill">Signed out</div>
+              <button class="btn secondary" id="logoutBtn" type="button" style="display:none">Sign out</button>
+            </div>
+            <div class="auth-tabs" role="tablist" aria-label="Account actions">
+              <button type="button" class="auth-tab active" data-panel="loginPanel" role="tab" aria-controls="loginPanel">Sign In</button>
+              <button type="button" class="auth-tab" data-panel="signupPanel" role="tab" aria-controls="signupPanel">Create Account</button>
+              <button type="button" class="auth-tab" data-panel="resetPanel" role="tab" aria-controls="resetPanel">Reset Password</button>
+            </div>
+
+            <form id="loginForm" class="auth-panel" data-panel="loginPanel">
+              <label for="loginEmail">Email</label>
+              <input id="loginEmail" name="loginEmail" type="email" required autocomplete="email" />
+              <label for="loginPassword">Password</label>
+              <input id="loginPassword" name="loginPassword" type="password" required autocomplete="current-password" />
+              <div class="actions">
+                <button class="btn" type="submit">Sign In</button>
+              </div>
+            </form>
+
+            <form id="signupForm" class="auth-panel hidden" data-panel="signupPanel">
+              <label for="signupEmail">Email</label>
+              <input id="signupEmail" name="signupEmail" type="email" required autocomplete="email" />
+              <label for="signupPassword">Password</label>
+              <input id="signupPassword" name="signupPassword" type="password" required autocomplete="new-password" />
+              <label for="signupConfirm">Confirm Password</label>
+              <input id="signupConfirm" name="signupConfirm" type="password" required autocomplete="new-password" />
+              <div class="actions">
+                <button class="btn" type="submit">Create Account</button>
+              </div>
+            </form>
+
+            <form id="resetForm" class="auth-panel hidden" data-panel="resetPanel">
+              <label for="resetEmail">Email</label>
+              <input id="resetEmail" name="resetEmail" type="email" required autocomplete="email" />
+              <p class="small">We will generate a temporary password and send it to the email on file. Use that password to sign in, then you will be prompted to change it.</p>
+              <div class="actions">
+                <button class="btn" type="submit">Send Temporary Password</button>
+              </div>
+            </form>
+
+            <form id="changePasswordForm" class="auth-panel hidden" data-panel="changePanel">
+              <div class="title" style="margin:0">Update Password (required)</div>
+              <p class="small">You signed in with a temporary password. Set a new one to continue saving orders.</p>
+              <label for="newPassword">New Password</label>
+              <input id="newPassword" name="newPassword" type="password" required autocomplete="new-password" />
+              <label for="confirmPassword">Confirm New Password</label>
+              <input id="confirmPassword" name="confirmPassword" type="password" required autocomplete="new-password" />
+              <div class="actions">
+                <button class="btn" type="submit">Save New Password</button>
+              </div>
+            </form>
+
+            <div id="tempPasswordDisplay" class="temp-password-display hidden">
+              <div class="small">Temporary password (shown for demo):</div>
+              <div class="pill mono" id="tempPasswordReveal"></div>
+            </div>
+
+            <div id="authMessage" class="message" style="display:none"></div>
+          </div>
+        </div>
+
+        <div class="card auth-card">
+          <div class="stack">
+            <div class="title">Saved Orders</div>
+            <p class="small">Orders submitted while signed in will appear here for quick reference.</p>
+            <div id="orderHistoryEmpty" class="empty-state">Sign in to view your order history.</div>
+            <div id="orderHistoryList" class="order-history"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Hero Header -->
     <section class="hero">
       <div class="card">

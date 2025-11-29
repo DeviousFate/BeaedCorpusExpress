@@ -179,6 +179,21 @@ const state = {
 };
 
 // ============================================================================
+// AUTH STORAGE (localStorage-powered demo)
+// ============================================================================
+const AUTH_KEYS = {
+  users: 'mti_users_v1',
+  session: 'mti_session_v1',
+};
+
+const authState = {
+  currentUserEmail: null,
+  passwordChangeRequired: false,
+};
+
+const MIN_PASSWORD_LENGTH = 8;
+
+// ============================================================================
 // DOM HELPERS
 // ============================================================================
 const $ = (sel) => document.querySelector(sel);
@@ -214,7 +229,7 @@ function renderFormatCards() {
     }
 
     const unit = currentCategory() === 'phenolic' ? phenolicUnitPriceForFormat(f) : null;
-    const badge = unit != null ? `Base $${unit.toFixed(2)}` : '—';
+    const badge = unit != null ? `Base $${unit.toFixed(2)}` : 'N/A';
     el.innerHTML = `
       <div style="flex:0 0 64px;display:grid;place-items:center">
         ${previewThumbSVG(f)}
@@ -286,7 +301,7 @@ function renderPreview() {
   const total = estimatePrice();
   const priceEl = $("#priceEstimate");
   if (priceEl) {
-    priceEl.textContent = (typeof total === 'number') ? `$${total.toFixed(2)}` : '—';
+    priceEl.textContent = (typeof total === 'number') ? `$${total.toFixed(2)}` : 'N/A';
   }
 }
 
@@ -536,8 +551,11 @@ function bindFormActions() {
     const jsonArea = $("#configJson");
     if (jsonArea) jsonArea.value = JSON.stringify(config, null, 2);
 
+    // Save to user history if signed in
+    recordCustomOrder(config);
+
     try {
-      showMessage("Preparing proof PDF and email…", "success");
+      showMessage("Preparing proof PDF and email...", "success");
       const blob = await generateProofPDFBlob();
       await composeQuoteEmailWithPDF(config, blob);
     } catch (err) {
@@ -639,7 +657,7 @@ function exportSpecsToPDF() {
     ['Adhesive', cfg.options.adhesive],
     ['Thickness', `${cfg.options.thickness} mm`],
     ['Quantity', String(cfg.order.quantity)],
-    ['Estimated Total', cfg.pricing.estimatedTotal ? `$${cfg.pricing.estimatedTotal} ${cfg.pricing.currency}` : '—'],
+    ['Estimated Total', cfg.pricing.estimatedTotal ? `$${cfg.pricing.estimatedTotal} ${cfg.pricing.currency}` : 'N/A'],
   ];
 
   const tableRowsHTML = specRows
@@ -795,7 +813,7 @@ async function generateProofPDFBlob() {
     ['Adhesive', cfg.options.adhesive],
     ['Thickness', `${cfg.options.thickness} mm`],
     ['Quantity', String(cfg.order.quantity)],
-    ['Estimated Total', cfg.pricing.estimatedTotal ? `$${cfg.pricing.estimatedTotal} ${cfg.pricing.currency}` : '—'],
+    ['Estimated Total', cfg.pricing.estimatedTotal ? `$${cfg.pricing.estimatedTotal} ${cfg.pricing.currency}` : 'N/A'],
   ];
   specRows.forEach(([k, v]) => {
     const tr = document.createElement('tr');
@@ -877,7 +895,7 @@ async function composeQuoteEmailWithPDF(config, blob) {
     `Format: ${config.format.label}`,
     `Dimensions: ${config.format.dimensions.width}\" x ${config.format.dimensions.height}\"`,
     `Quantity: ${config.order.quantity}`,
-    `Estimated Total: ${config.pricing.estimatedTotal ? '$' + config.pricing.estimatedTotal + ' ' + config.pricing.currency : '—'}`,
+    `Estimated Total: ${config.pricing.estimatedTotal ? '$' + config.pricing.estimatedTotal + ' ' + config.pricing.currency : 'N/A'}`,
     '',
     blob ? 'A proof PDF has been downloaded. Please attach it to this email.' : 'Unable to generate a PDF automatically.',
   ];
@@ -915,6 +933,423 @@ function showMessage(text, type = "success") {
 }
 
 // ============================================================================
+// AUTH & ORDER HISTORY (localStorage demo)
+// ============================================================================
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function loadUsersFromStorage() {
+  try {
+    const raw = localStorage.getItem(AUTH_KEYS.users);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.warn("Could not read user store", err);
+    return [];
+  }
+}
+
+function saveUsersToStorage(users) {
+  try {
+    localStorage.setItem(AUTH_KEYS.users, JSON.stringify(users));
+  } catch (err) {
+    console.warn("Could not persist user store", err);
+  }
+}
+
+function findUserByEmail(email) {
+  const emailNorm = normalizeEmail(email);
+  return loadUsersFromStorage().find((u) => u.email === emailNorm) || null;
+}
+
+function persistUserRecord(user) {
+  const users = loadUsersFromStorage();
+  const idx = users.findIndex((u) => u.email === user.email);
+  if (idx >= 0) {
+    users[idx] = user;
+  } else {
+    users.push(user);
+  }
+  saveUsersToStorage(users);
+  return user;
+}
+
+function setSession(email) {
+  if (email) {
+    localStorage.setItem(AUTH_KEYS.session, normalizeEmail(email));
+  } else {
+    localStorage.removeItem(AUTH_KEYS.session);
+  }
+}
+
+function hydrateAuthFromStorage() {
+  const savedEmail = localStorage.getItem(AUTH_KEYS.session);
+  if (!savedEmail) return;
+  const user = findUserByEmail(savedEmail);
+  if (user) {
+    authState.currentUserEmail = user.email;
+    authState.passwordChangeRequired = !!user.requirePasswordChange;
+  }
+}
+
+let activeAuthPanel = "loginPanel";
+
+function flashAuthMessage(text, type = "info") {
+  const el = $("#authMessage");
+  if (!el) return;
+  el.textContent = text;
+  el.className = `message ${type}`;
+  el.style.display = "block";
+  setTimeout(() => {
+    if (el.textContent === text) el.style.display = "none";
+  }, 5000);
+}
+
+function toggleTempPasswordDisplay(temp) {
+  const wrap = $("#tempPasswordDisplay");
+  const val = $("#tempPasswordReveal");
+  if (!wrap || !val) return;
+  if (temp) {
+    val.textContent = temp;
+    wrap.classList.remove("hidden");
+  } else {
+    val.textContent = "";
+    wrap.classList.add("hidden");
+  }
+}
+
+function switchAuthPanel(panelName) {
+  activeAuthPanel = panelName || activeAuthPanel;
+  const panels = $$(".auth-panel");
+  const forceChange = !!authState.passwordChangeRequired;
+  panels.forEach((panel) => {
+    const name = panel.dataset.panel;
+    if (forceChange) {
+      panel.classList.toggle("hidden", name !== "changePanel");
+    } else {
+      panel.classList.toggle("hidden", name !== activeAuthPanel);
+    }
+  });
+
+  $$(".auth-tab").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.panel === activeAuthPanel);
+  });
+}
+
+function renderAuthUI() {
+  const statusEl = $("#authStatus");
+  const logoutBtn = $("#logoutBtn");
+  const isSignedIn = !!authState.currentUserEmail;
+  if (statusEl) {
+    statusEl.textContent = isSignedIn
+      ? `Signed in as ${authState.currentUserEmail}${authState.passwordChangeRequired ? " (update password)" : ""}`
+      : "Signed out";
+  }
+  if (logoutBtn) logoutBtn.style.display = isSignedIn ? "inline-flex" : "none";
+
+  if (authState.passwordChangeRequired) {
+    switchAuthPanel("changePanel");
+  } else {
+    switchAuthPanel(activeAuthPanel || "loginPanel");
+  }
+
+  renderOrderHistory();
+}
+
+function renderOrderHistory() {
+  const list = $("#orderHistoryList");
+  const empty = $("#orderHistoryEmpty");
+  if (!list || !empty) return;
+
+  const user = authState.currentUserEmail ? findUserByEmail(authState.currentUserEmail) : null;
+  list.innerHTML = "";
+
+  if (!user) {
+    empty.textContent = "Sign in to view your order history.";
+    empty.classList.remove("hidden");
+    return;
+  }
+
+  const orders = Array.isArray(user.orders) ? user.orders : [];
+  if (!orders.length) {
+    empty.textContent = "No saved orders yet. Submit a quote while signed in to store it here.";
+    empty.classList.remove("hidden");
+    return;
+  }
+
+  empty.classList.add("hidden");
+  const frag = document.createDocumentFragment();
+  orders.forEach((ord) => {
+    const item = document.createElement("div");
+    item.className = "order-item";
+
+    const titleRow = document.createElement("div");
+    titleRow.className = "order-top";
+    const title = document.createElement("div");
+    title.className = "order-title";
+    title.textContent = ord.title || "Order";
+    const badge = document.createElement("span");
+    badge.className = "badge mono";
+    badge.textContent = `${ord.kind === "stock" ? "Stock" : "Custom"} - Qty ${ord.qty || ord.quantity || 0}`;
+    titleRow.appendChild(title);
+    titleRow.appendChild(badge);
+
+    const meta = document.createElement("div");
+    meta.className = "order-meta";
+    const when = document.createElement("span");
+    when.textContent = new Date(ord.createdAt || Date.now()).toLocaleString();
+    const price = document.createElement("span");
+    const total = typeof ord.total === "number" ? ord.total : parseFloat(ord.total);
+    price.textContent = isFinite(total) ? `$${total.toFixed(2)}` : "No estimate";
+    const desc = document.createElement("span");
+    desc.textContent = ord.summary || ord.detail || "";
+    meta.appendChild(when);
+    meta.appendChild(price);
+    if (desc.textContent) meta.appendChild(desc);
+
+    item.appendChild(titleRow);
+    item.appendChild(meta);
+    frag.appendChild(item);
+  });
+
+  list.appendChild(frag);
+}
+
+function addOrderForCurrentUser(order) {
+  const email = authState.currentUserEmail;
+  if (!email) return;
+  const users = loadUsersFromStorage();
+  const idx = users.findIndex((u) => u.email === email);
+  if (idx === -1) return;
+  const user = users[idx];
+  if (user.requirePasswordChange) {
+    flashAuthMessage("Update your password to start saving new orders.", "warn");
+    return;
+  }
+  user.orders = Array.isArray(user.orders) ? user.orders : [];
+  user.orders.unshift(order);
+  user.orders = user.orders.slice(0, 25); // keep it manageable
+  users[idx] = user;
+  saveUsersToStorage(users);
+  renderOrderHistory();
+}
+
+function recordCustomOrder(config) {
+  const order = {
+    id: `ord-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    kind: "custom",
+    title: `${config.format.label || config.format.id || "Custom"} (${config.colors.signType})`,
+    qty: config.order.quantity,
+    total: config.pricing.estimatedTotal ? Number(config.pricing.estimatedTotal) : null,
+    summary: [config.text.line1, config.text.line2].filter(Boolean).join(" / "),
+  };
+  addOrderForCurrentUser(order);
+}
+
+function recordStockOrder(sel, qty, total) {
+  const order = {
+    id: `stock-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    kind: "stock",
+    title: `${sel.label || "Stock tag"}`,
+    qty,
+    total,
+    summary: `Image: ${sel.img}`,
+  };
+  addOrderForCurrentUser(order);
+}
+
+function generateTempPassword(len = 10) {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%";
+  let out = "";
+  for (let i = 0; i < len; i += 1) {
+    out += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return out;
+}
+
+function handleLogin(email, password) {
+  toggleTempPasswordDisplay(null);
+  const emailNorm = normalizeEmail(email);
+  if (!emailNorm || !password) {
+    flashAuthMessage("Email and password are required to sign in.", "error");
+    return;
+  }
+  const user = findUserByEmail(emailNorm);
+  if (!user) {
+    flashAuthMessage("Account not found. Create one first.", "error");
+    return;
+  }
+  if (user.requirePasswordChange) {
+    if (password !== user.tempPassword) {
+      flashAuthMessage("Use the temporary password we sent to your email.", "error");
+      return;
+    }
+    authState.currentUserEmail = user.email;
+    authState.passwordChangeRequired = true;
+    setSession(user.email);
+    flashAuthMessage("Temporary password accepted. Set a new password below.", "info");
+    switchAuthPanel("changePanel");
+    renderAuthUI();
+    return;
+  }
+  if (user.password !== password) {
+    flashAuthMessage("Incorrect password. Try again.", "error");
+    return;
+  }
+
+  authState.currentUserEmail = user.email;
+  authState.passwordChangeRequired = false;
+  setSession(user.email);
+  flashAuthMessage("Signed in. Orders will be saved to your account.", "success");
+  switchAuthPanel("loginPanel");
+  renderAuthUI();
+}
+
+function handleSignup(email, password, confirm) {
+  toggleTempPasswordDisplay(null);
+  const emailNorm = normalizeEmail(email);
+  if (!emailNorm || !password || !confirm) {
+    flashAuthMessage("All fields are required to create an account.", "error");
+    return;
+  }
+  if (password !== confirm) {
+    flashAuthMessage("Passwords do not match.", "error");
+    return;
+  }
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    flashAuthMessage(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`, "error");
+    return;
+  }
+  if (findUserByEmail(emailNorm)) {
+    flashAuthMessage("An account with that email already exists.", "error");
+    return;
+  }
+
+  const newUser = {
+    email: emailNorm,
+    password,
+    tempPassword: null,
+    requirePasswordChange: false,
+    orders: [],
+  };
+  persistUserRecord(newUser);
+  authState.currentUserEmail = newUser.email;
+  authState.passwordChangeRequired = false;
+  setSession(newUser.email);
+  flashAuthMessage("Account created and signed in.", "success");
+  switchAuthPanel("loginPanel");
+  renderAuthUI();
+}
+
+function handlePasswordReset(email) {
+  const emailNorm = normalizeEmail(email);
+  if (!emailNorm) {
+    flashAuthMessage("Enter the email on your account to reset the password.", "error");
+    return;
+  }
+  const users = loadUsersFromStorage();
+  const idx = users.findIndex((u) => u.email === emailNorm);
+  if (idx === -1) {
+    flashAuthMessage("No account found for that email.", "error");
+    return;
+  }
+
+  const temp = generateTempPassword();
+  users[idx].tempPassword = temp;
+  users[idx].requirePasswordChange = true;
+  users[idx].password = null;
+  saveUsersToStorage(users);
+  authState.currentUserEmail = null;
+  authState.passwordChangeRequired = false;
+  setSession(null);
+  flashAuthMessage("Temporary password generated. Check your email for it (shown here for demo).", "info");
+  toggleTempPasswordDisplay(temp);
+  switchAuthPanel("loginPanel");
+  renderAuthUI();
+}
+
+function handlePasswordChange(newPass, confirm) {
+  if (!authState.currentUserEmail) {
+    flashAuthMessage("Sign in with your temporary password first.", "error");
+    return;
+  }
+  if (newPass !== confirm) {
+    flashAuthMessage("Passwords do not match.", "error");
+    return;
+  }
+  if (newPass.length < MIN_PASSWORD_LENGTH) {
+    flashAuthMessage(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`, "error");
+    return;
+  }
+
+  const users = loadUsersFromStorage();
+  const idx = users.findIndex((u) => u.email === authState.currentUserEmail);
+  if (idx === -1) {
+    flashAuthMessage("Could not locate your account record.", "error");
+    return;
+  }
+
+  users[idx].password = newPass;
+  users[idx].tempPassword = null;
+  users[idx].requirePasswordChange = false;
+  saveUsersToStorage(users);
+
+  authState.passwordChangeRequired = false;
+  flashAuthMessage("Password updated. You can continue saving orders.", "success");
+  switchAuthPanel("loginPanel");
+  renderAuthUI();
+}
+
+function bindAuthUI() {
+  $$(".auth-tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (authState.passwordChangeRequired) return; // force change flow
+      switchAuthPanel(btn.dataset.panel);
+    });
+  });
+
+  $("#loginForm")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    handleLogin($("#loginEmail")?.value, $("#loginPassword")?.value);
+  });
+
+  $("#signupForm")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    handleSignup($("#signupEmail")?.value, $("#signupPassword")?.value, $("#signupConfirm")?.value);
+  });
+
+  $("#resetForm")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    handlePasswordReset($("#resetEmail")?.value);
+  });
+
+  $("#changePasswordForm")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    handlePasswordChange($("#newPassword")?.value, $("#confirmPassword")?.value);
+  });
+
+  $("#logoutBtn")?.addEventListener("click", () => {
+    authState.currentUserEmail = null;
+    authState.passwordChangeRequired = false;
+    setSession(null);
+    flashAuthMessage("Signed out.", "info");
+    toggleTempPasswordDisplay(null);
+    switchAuthPanel("loginPanel");
+    renderAuthUI();
+  });
+}
+
+function initAuth() {
+  bindAuthUI();
+  hydrateAuthFromStorage();
+  switchAuthPanel(activeAuthPanel);
+  renderAuthUI();
+}
+
+// ============================================================================
 // UPDATE ALL UI ELEMENTS
 // ============================================================================
 function updateAll() {
@@ -942,6 +1377,7 @@ function init() {
   bindFormActions();
   // Stock safety tags events
   bindStockTagControls();
+  initAuth();
   updateAll();
 }
 
@@ -1022,6 +1458,9 @@ function submitStockOrderEmail() {
   const qty = normalizePacks(state.stockQty || PRICING.setSize);
   const sets = Math.ceil(qty / PRICING.setSize);
   const total = sets * PRICING.nonPhenolicSetPrice;
+
+  // Save to user history if signed in
+  recordStockOrder(sel, qty, total);
 
   const company = document.getElementById('company')?.value || '';
   const contact = document.getElementById('contact')?.value || '';

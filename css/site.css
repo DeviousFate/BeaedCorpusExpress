@@ -90,6 +90,64 @@ input[type="text"], input[type="number"], select, textarea{
 }
 textarea{ min-height:80px; resize:vertical }
 
+/* ========== Auth & Orders ========== */
+.auth-section{ margin-top:8px }
+.auth-card{ padding:16px 16px 18px }
+.auth-topline{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap }
+.auth-tabs{
+  display:flex; gap:6px; padding:6px;
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+}
+.auth-tab{
+  flex:1; text-align:center;
+  background:transparent; border:1px solid transparent; color:var(--ink-soft);
+  padding:10px; border-radius:10px; font-weight:700;
+}
+.auth-tab.active{
+  background:var(--card); border-color:var(--border); color:var(--ink);
+  box-shadow:0 6px 18px rgba(0,0,0,.25);
+}
+.auth-panel.hidden{ display:none }
+.hidden{ display:none !important }
+.temp-password-display{
+  background:#0f131a;
+  border:1px dashed var(--border);
+  border-radius:12px;
+  padding:10px 12px;
+}
+.empty-state{
+  border:1px dashed var(--border);
+  border-radius:12px;
+  padding:12px;
+  color:var(--ink-soft);
+  background:#0f131a;
+}
+.order-history{ display:flex; flex-direction:column; gap:10px }
+.order-item{
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:12px;
+  background:#0e1218;
+}
+.order-item .order-top{ display:flex; align-items:center; gap:10px; justify-content:space-between }
+.order-item .order-title{ font-weight:700; color:var(--ink) }
+.order-item .order-meta{
+  display:flex; flex-wrap:wrap; gap:12px;
+  font-size:13px; color:var(--ink-soft); margin-top:6px;
+}
+
+.message{
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:#0e141b;
+  color:var(--ink);
+}
+.message.success{ border-color:var(--success); color:var(--success) }
+.message.error{ border-color:var(--danger); color:var(--danger) }
+.message.info{ border-color:var(--brand); color:var(--ink) }
+.message.warn{ border-color:#f59e0b; color:#f59e0b }
+
 /* ========== Format cards ========== */
 .formats {
   position: relative;
@@ -166,7 +224,7 @@ textarea{ min-height:80px; resize:vertical }
 /* ========== Responsiveness ========== */
 @media (max-width: 980px){
   .hero{ grid-template-columns:1fr }             /* stack hero on tablets */
-  .grid.cols-3{ grid-template-columns:1fr 1fr }  /* 3 → 2 columns */
+  .grid.cols-3{ grid-template-columns:1fr 1fr }  /* 3 to 2 columns */
 }
 @media (max-width: 720px){
   .grid.cols-3, .grid.cols-2{ grid-template-columns:1fr }  /* collapse to 1 column */
