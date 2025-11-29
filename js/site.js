@@ -179,19 +179,15 @@ const state = {
 };
 
 // ============================================================================
-// AUTH STORAGE (localStorage-powered demo)
+// AUTH & ORDERS (API-backed)
 // ============================================================================
-const AUTH_KEYS = {
-  users: 'mti_users_v1',
-  session: 'mti_session_v1',
-};
+const MIN_PASSWORD_LENGTH = 8;
 
 const authState = {
-  currentUserEmail: null,
-  passwordChangeRequired: false,
+  user: null, // { email, passwordChangeRequired }
+  orders: [],
+  latestResetTemp: null, // demo-only temp password surface
 };
-
-const MIN_PASSWORD_LENGTH = 8;
 
 // ============================================================================
 // DOM HELPERS
@@ -199,6 +195,65 @@ const MIN_PASSWORD_LENGTH = 8;
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 const fmt = () => FORMATS.find((f) => f.id === state.formatId);
+
+// ============================================================================
+// API HELPERS (backend parity)
+// ============================================================================
+const API_BASE = "/api";
+
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+async function apiRequest(path, opts = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: opts.method || "GET",
+    headers: {
+      "Content-Type": "application/json",
+      ...(opts.headers || {}),
+    },
+    credentials: "include",
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+
+  let data = null;
+  try {
+    data = await res.json();
+  } catch (_) {
+    data = null;
+  }
+
+  if (!res.ok) {
+    const msg = (data && (data.error || data.message)) || res.statusText || "Request failed";
+    throw new Error(msg);
+  }
+  return data;
+}
+
+async function apiGetSession() {
+  return apiRequest("/session");
+}
+async function apiSignup(email, password) {
+  return apiRequest("/signup", { method: "POST", body: { email: normalizeEmail(email), password } });
+}
+async function apiLogin(email, password) {
+  return apiRequest("/login", { method: "POST", body: { email: normalizeEmail(email), password } });
+}
+async function apiLogout() {
+  return apiRequest("/logout", { method: "POST" });
+}
+async function apiResetPassword(email) {
+  return apiRequest("/password/reset", { method: "POST", body: { email: normalizeEmail(email) } });
+}
+async function apiUpdatePassword(newPassword) {
+  return apiRequest("/password/update", { method: "POST", body: { newPassword } });
+}
+async function apiListOrders() {
+  return apiRequest("/orders");
+}
+async function apiCreateOrder(order) {
+  return apiRequest("/orders", { method: "POST", body: { order } });
+}
 
 // Apply text case transformation
 function applyCase(str) {
@@ -933,66 +988,8 @@ function showMessage(text, type = "success") {
 }
 
 // ============================================================================
-// AUTH & ORDER HISTORY (localStorage demo)
+// AUTH & ORDER HISTORY (API-backed)
 // ============================================================================
-function normalizeEmail(email) {
-  return String(email || "").trim().toLowerCase();
-}
-
-function loadUsersFromStorage() {
-  try {
-    const raw = localStorage.getItem(AUTH_KEYS.users);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (err) {
-    console.warn("Could not read user store", err);
-    return [];
-  }
-}
-
-function saveUsersToStorage(users) {
-  try {
-    localStorage.setItem(AUTH_KEYS.users, JSON.stringify(users));
-  } catch (err) {
-    console.warn("Could not persist user store", err);
-  }
-}
-
-function findUserByEmail(email) {
-  const emailNorm = normalizeEmail(email);
-  return loadUsersFromStorage().find((u) => u.email === emailNorm) || null;
-}
-
-function persistUserRecord(user) {
-  const users = loadUsersFromStorage();
-  const idx = users.findIndex((u) => u.email === user.email);
-  if (idx >= 0) {
-    users[idx] = user;
-  } else {
-    users.push(user);
-  }
-  saveUsersToStorage(users);
-  return user;
-}
-
-function setSession(email) {
-  if (email) {
-    localStorage.setItem(AUTH_KEYS.session, normalizeEmail(email));
-  } else {
-    localStorage.removeItem(AUTH_KEYS.session);
-  }
-}
-
-function hydrateAuthFromStorage() {
-  const savedEmail = localStorage.getItem(AUTH_KEYS.session);
-  if (!savedEmail) return;
-  const user = findUserByEmail(savedEmail);
-  if (user) {
-    authState.currentUserEmail = user.email;
-    authState.passwordChangeRequired = !!user.requirePasswordChange;
-  }
-}
-
 let activeAuthPanel = "loginPanel";
 
 function flashAuthMessage(text, type = "info") {
@@ -1021,39 +1018,33 @@ function toggleTempPasswordDisplay(temp) {
 
 function switchAuthPanel(panelName) {
   activeAuthPanel = panelName || activeAuthPanel;
+  const forceChange = !!(authState.user && authState.user.passwordChangeRequired);
   const panels = $$(".auth-panel");
-  const forceChange = !!authState.passwordChangeRequired;
   panels.forEach((panel) => {
     const name = panel.dataset.panel;
-    if (forceChange) {
-      panel.classList.toggle("hidden", name !== "changePanel");
-    } else {
-      panel.classList.toggle("hidden", name !== activeAuthPanel);
-    }
+    const target = forceChange ? "changePanel" : activeAuthPanel;
+    panel.classList.toggle("hidden", name !== target);
   });
 
   $$(".auth-tab").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.panel === activeAuthPanel);
+    const target = forceChange ? "changePanel" : activeAuthPanel;
+    btn.classList.toggle("active", btn.dataset.panel === target);
   });
 }
 
 function renderAuthUI() {
   const statusEl = $("#authStatus");
   const logoutBtn = $("#logoutBtn");
-  const isSignedIn = !!authState.currentUserEmail;
+  const user = authState.user;
+  const isSignedIn = !!user;
   if (statusEl) {
     statusEl.textContent = isSignedIn
-      ? `Signed in as ${authState.currentUserEmail}${authState.passwordChangeRequired ? " (update password)" : ""}`
+      ? `Signed in as ${user.email}${user.passwordChangeRequired ? " (update password)" : ""}`
       : "Signed out";
   }
   if (logoutBtn) logoutBtn.style.display = isSignedIn ? "inline-flex" : "none";
 
-  if (authState.passwordChangeRequired) {
-    switchAuthPanel("changePanel");
-  } else {
-    switchAuthPanel(activeAuthPanel || "loginPanel");
-  }
-
+  switchAuthPanel(activeAuthPanel || "loginPanel");
   renderOrderHistory();
 }
 
@@ -1062,16 +1053,15 @@ function renderOrderHistory() {
   const empty = $("#orderHistoryEmpty");
   if (!list || !empty) return;
 
-  const user = authState.currentUserEmail ? findUserByEmail(authState.currentUserEmail) : null;
   list.innerHTML = "";
 
-  if (!user) {
+  if (!authState.user) {
     empty.textContent = "Sign in to view your order history.";
     empty.classList.remove("hidden");
     return;
   }
 
-  const orders = Array.isArray(user.orders) ? user.orders : [];
+  const orders = Array.isArray(authState.orders) ? authState.orders : [];
   if (!orders.length) {
     empty.textContent = "No saved orders yet. Submit a quote while signed in to store it here.";
     empty.classList.remove("hidden");
@@ -1116,102 +1106,63 @@ function renderOrderHistory() {
   list.appendChild(frag);
 }
 
-function addOrderForCurrentUser(order) {
-  const email = authState.currentUserEmail;
-  if (!email) return;
-  const users = loadUsersFromStorage();
-  const idx = users.findIndex((u) => u.email === email);
-  if (idx === -1) return;
-  const user = users[idx];
-  if (user.requirePasswordChange) {
-    flashAuthMessage("Update your password to start saving new orders.", "warn");
-    return;
+async function persistOrderToServer(order) {
+  if (!authState.user) return;
+  try {
+    await apiCreateOrder(order);
+    await refreshOrders();
+  } catch (err) {
+    flashAuthMessage(err.message || "Could not save order to your account.", "error");
   }
-  user.orders = Array.isArray(user.orders) ? user.orders : [];
-  user.orders.unshift(order);
-  user.orders = user.orders.slice(0, 25); // keep it manageable
-  users[idx] = user;
-  saveUsersToStorage(users);
-  renderOrderHistory();
 }
 
 function recordCustomOrder(config) {
+  if (!authState.user) return;
   const order = {
-    id: `ord-${Date.now()}`,
-    createdAt: new Date().toISOString(),
     kind: "custom",
     title: `${config.format.label || config.format.id || "Custom"} (${config.colors.signType})`,
     qty: config.order.quantity,
     total: config.pricing.estimatedTotal ? Number(config.pricing.estimatedTotal) : null,
     summary: [config.text.line1, config.text.line2].filter(Boolean).join(" / "),
+    config,
   };
-  addOrderForCurrentUser(order);
+  persistOrderToServer(order);
 }
 
 function recordStockOrder(sel, qty, total) {
+  if (!authState.user) return;
   const order = {
-    id: `stock-${Date.now()}`,
-    createdAt: new Date().toISOString(),
     kind: "stock",
     title: `${sel.label || "Stock tag"}`,
     qty,
     total,
     summary: `Image: ${sel.img}`,
   };
-  addOrderForCurrentUser(order);
+  persistOrderToServer(order);
 }
 
-function generateTempPassword(len = 10) {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%";
-  let out = "";
-  for (let i = 0; i < len; i += 1) {
-    out += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return out;
-}
-
-function handleLogin(email, password) {
+async function handleLogin(email, password) {
   toggleTempPasswordDisplay(null);
-  const emailNorm = normalizeEmail(email);
-  if (!emailNorm || !password) {
+  if (!email || !password) {
     flashAuthMessage("Email and password are required to sign in.", "error");
     return;
   }
-  const user = findUserByEmail(emailNorm);
-  if (!user) {
-    flashAuthMessage("Account not found. Create one first.", "error");
-    return;
-  }
-  if (user.requirePasswordChange) {
-    if (password !== user.tempPassword) {
-      flashAuthMessage("Use the temporary password we sent to your email.", "error");
-      return;
-    }
-    authState.currentUserEmail = user.email;
-    authState.passwordChangeRequired = true;
-    setSession(user.email);
-    flashAuthMessage("Temporary password accepted. Set a new password below.", "info");
-    switchAuthPanel("changePanel");
+  try {
+    const data = await apiLogin(email, password);
+    authState.user = data.user || null;
+    flashAuthMessage(data.message || "Signed in. Orders will be saved to your account.", "success");
+    activeAuthPanel = authState.user?.passwordChangeRequired ? "changePanel" : "loginPanel";
+    switchAuthPanel(activeAuthPanel);
+    await refreshOrders();
     renderAuthUI();
-    return;
+  } catch (err) {
+    flashAuthMessage(err.message || "Could not sign in.", "error");
   }
-  if (user.password !== password) {
-    flashAuthMessage("Incorrect password. Try again.", "error");
-    return;
-  }
-
-  authState.currentUserEmail = user.email;
-  authState.passwordChangeRequired = false;
-  setSession(user.email);
-  flashAuthMessage("Signed in. Orders will be saved to your account.", "success");
-  switchAuthPanel("loginPanel");
-  renderAuthUI();
 }
 
-function handleSignup(email, password, confirm) {
+async function handleSignup(email, password, confirm) {
   toggleTempPasswordDisplay(null);
-  const emailNorm = normalizeEmail(email);
-  if (!emailNorm || !password || !confirm) {
+  if (!email || !password || !confirm) {
     flashAuthMessage("All fields are required to create an account.", "error");
     return;
   }
@@ -1223,56 +1174,41 @@ function handleSignup(email, password, confirm) {
     flashAuthMessage(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`, "error");
     return;
   }
-  if (findUserByEmail(emailNorm)) {
-    flashAuthMessage("An account with that email already exists.", "error");
-    return;
+  try {
+    const data = await apiSignup(email, password);
+    authState.user = data.user || null;
+    flashAuthMessage(data.message || "Account created and signed in.", "success");
+    activeAuthPanel = "loginPanel";
+    switchAuthPanel(activeAuthPanel);
+    await refreshOrders();
+    renderAuthUI();
+  } catch (err) {
+    flashAuthMessage(err.message || "Could not create account.", "error");
   }
-
-  const newUser = {
-    email: emailNorm,
-    password,
-    tempPassword: null,
-    requirePasswordChange: false,
-    orders: [],
-  };
-  persistUserRecord(newUser);
-  authState.currentUserEmail = newUser.email;
-  authState.passwordChangeRequired = false;
-  setSession(newUser.email);
-  flashAuthMessage("Account created and signed in.", "success");
-  switchAuthPanel("loginPanel");
-  renderAuthUI();
 }
 
-function handlePasswordReset(email) {
-  const emailNorm = normalizeEmail(email);
-  if (!emailNorm) {
+async function handlePasswordReset(email) {
+  if (!email) {
     flashAuthMessage("Enter the email on your account to reset the password.", "error");
     return;
   }
-  const users = loadUsersFromStorage();
-  const idx = users.findIndex((u) => u.email === emailNorm);
-  if (idx === -1) {
-    flashAuthMessage("No account found for that email.", "error");
-    return;
+  try {
+    const data = await apiResetPassword(email);
+    authState.user = null;
+    authState.orders = [];
+    authState.latestResetTemp = data.demoTempPassword || null;
+    toggleTempPasswordDisplay(authState.latestResetTemp);
+    flashAuthMessage(data.message || "Temporary password generated. Check your email.", "info");
+    activeAuthPanel = "loginPanel";
+    switchAuthPanel(activeAuthPanel);
+    renderAuthUI();
+  } catch (err) {
+    flashAuthMessage(err.message || "Could not reset password.", "error");
   }
-
-  const temp = generateTempPassword();
-  users[idx].tempPassword = temp;
-  users[idx].requirePasswordChange = true;
-  users[idx].password = null;
-  saveUsersToStorage(users);
-  authState.currentUserEmail = null;
-  authState.passwordChangeRequired = false;
-  setSession(null);
-  flashAuthMessage("Temporary password generated. Check your email for it (shown here for demo).", "info");
-  toggleTempPasswordDisplay(temp);
-  switchAuthPanel("loginPanel");
-  renderAuthUI();
 }
 
-function handlePasswordChange(newPass, confirm) {
-  if (!authState.currentUserEmail) {
+async function handlePasswordChange(newPass, confirm) {
+  if (!authState.user) {
     flashAuthMessage("Sign in with your temporary password first.", "error");
     return;
   }
@@ -1284,69 +1220,91 @@ function handlePasswordChange(newPass, confirm) {
     flashAuthMessage(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`, "error");
     return;
   }
-
-  const users = loadUsersFromStorage();
-  const idx = users.findIndex((u) => u.email === authState.currentUserEmail);
-  if (idx === -1) {
-    flashAuthMessage("Could not locate your account record.", "error");
-    return;
+  try {
+    const data = await apiUpdatePassword(newPass);
+    authState.user = data.user || null;
+    flashAuthMessage(data.message || "Password updated. You can continue saving orders.", "success");
+    activeAuthPanel = "loginPanel";
+    switchAuthPanel(activeAuthPanel);
+    await refreshOrders();
+    renderAuthUI();
+  } catch (err) {
+    flashAuthMessage(err.message || "Could not update password.", "error");
   }
-
-  users[idx].password = newPass;
-  users[idx].tempPassword = null;
-  users[idx].requirePasswordChange = false;
-  saveUsersToStorage(users);
-
-  authState.passwordChangeRequired = false;
-  flashAuthMessage("Password updated. You can continue saving orders.", "success");
-  switchAuthPanel("loginPanel");
-  renderAuthUI();
 }
 
 function bindAuthUI() {
   $$(".auth-tab").forEach((btn) => {
     btn.addEventListener("click", () => {
-      if (authState.passwordChangeRequired) return; // force change flow
+      if (authState.user?.passwordChangeRequired) return; // force change flow
       switchAuthPanel(btn.dataset.panel);
     });
   });
 
-  $("#loginForm")?.addEventListener("submit", (e) => {
+  $("#loginForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    handleLogin($("#loginEmail")?.value, $("#loginPassword")?.value);
+    await handleLogin($("#loginEmail")?.value, $("#loginPassword")?.value);
   });
 
-  $("#signupForm")?.addEventListener("submit", (e) => {
+  $("#signupForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    handleSignup($("#signupEmail")?.value, $("#signupPassword")?.value, $("#signupConfirm")?.value);
+    await handleSignup($("#signupEmail")?.value, $("#signupPassword")?.value, $("#signupConfirm")?.value);
   });
 
-  $("#resetForm")?.addEventListener("submit", (e) => {
+  $("#resetForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    handlePasswordReset($("#resetEmail")?.value);
+    await handlePasswordReset($("#resetEmail")?.value);
   });
 
-  $("#changePasswordForm")?.addEventListener("submit", (e) => {
+  $("#changePasswordForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    handlePasswordChange($("#newPassword")?.value, $("#confirmPassword")?.value);
+    await handlePasswordChange($("#newPassword")?.value, $("#confirmPassword")?.value);
   });
 
-  $("#logoutBtn")?.addEventListener("click", () => {
-    authState.currentUserEmail = null;
-    authState.passwordChangeRequired = false;
-    setSession(null);
-    flashAuthMessage("Signed out.", "info");
+  $("#logoutBtn")?.addEventListener("click", async () => {
+    try {
+      await apiLogout();
+    } catch (_) { /* swallow */ }
+    authState.user = null;
+    authState.orders = [];
+    authState.latestResetTemp = null;
     toggleTempPasswordDisplay(null);
-    switchAuthPanel("loginPanel");
+    flashAuthMessage("Signed out.", "info");
+    activeAuthPanel = "loginPanel";
+    switchAuthPanel(activeAuthPanel);
     renderAuthUI();
   });
 }
 
-function initAuth() {
-  bindAuthUI();
-  hydrateAuthFromStorage();
-  switchAuthPanel(activeAuthPanel);
+async function refreshSession() {
+  try {
+    const data = await apiGetSession();
+    authState.user = data.user || null;
+  } catch (_) {
+    authState.user = null;
+  }
   renderAuthUI();
+}
+
+async function refreshOrders() {
+  if (!authState.user) {
+    authState.orders = [];
+    renderOrderHistory();
+    return;
+  }
+  try {
+    const data = await apiListOrders();
+    authState.orders = Array.isArray(data.orders) ? data.orders : [];
+  } catch (err) {
+    flashAuthMessage(err.message || "Could not load orders.", "error");
+  }
+  renderOrderHistory();
+}
+
+async function initAuth() {
+  bindAuthUI();
+  await refreshSession();
+  await refreshOrders();
 }
 
 // ============================================================================
