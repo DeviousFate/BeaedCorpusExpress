@@ -42,11 +42,13 @@ A lightweight Node/Express API now backs authentication and order history.
 - Tech: Express, cookie-based sessions, bcryptjs for hashing, JSON file storage at `server/data/db.json`.
 - API routes (all JSON, with credentials/cookies):
   - `GET /api/session` - current user (if signed in)
-  - `POST /api/signup` - `{ email, password }`
+  - `POST /api/signup` - `{ email, password, phone? }`
   - `POST /api/login` - `{ email, password }` (accepts temp passwords, marks `passwordChangeRequired`)
   - `POST /api/logout`
   - `POST /api/password/reset` - `{ email }` (generates temp password, logs it to server console for now)
   - `POST /api/password/update` - `{ newPassword }` (requires auth)
+  - `GET /api/profile` - returns stored profile fields for the signed-in user
+  - `POST /api/profile` - `{ company?, primaryContact?, phone?, secondaryEmail?, address1?, address2?, zip?, city?, state?, country? }`
   - `GET /api/orders` - list orders for the signed-in user
   - `POST /api/orders` - `{ order }` to save custom/stock orders
 

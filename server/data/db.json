@@ -1,0 +1,30 @@
+{
+  "users": [
+    {
+      "id": "u-b96621d5b0eef517",
+      "email": "thomas.cheek1@snhu.edu",
+      "passwordHash": "$2a$10$3zLJq8iHlKLmo2yXTy75auFNBhosjit0eh5xwSY3a9MIAWrVLWKtm",
+      "tempPasswordHash": null,
+      "requirePasswordChange": false,
+      "orders": [],
+      "createdAt": "2025-11-29T22:02:49.003Z",
+      "company": "",
+      "primaryContact": "",
+      "phone": "",
+      "secondaryEmail": "",
+      "address1": "202 FM 2004 Rd",
+      "address2": "20114",
+      "zip": "77566",
+      "city": "Lake Jackson",
+      "state": "TX",
+      "country": "United States"
+    }
+  ],
+  "sessions": [
+    {
+      "token": "01cd1a66439c82f1591f1b8bbbb45a5e952e2beb5b206183",
+      "userId": "u-b96621d5b0eef517",
+      "expiresAt": 1765058825222
+    }
+  ]
+}

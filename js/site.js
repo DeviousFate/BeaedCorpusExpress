@@ -184,7 +184,7 @@ const state = {
 const MIN_PASSWORD_LENGTH = 8;
 
 const authState = {
-  user: null, // { email, passwordChangeRequired }
+  user: null, // { email, phone, passwordChangeRequired }
   orders: [],
   latestResetTemp: null, // demo-only temp password surface
 };
@@ -233,8 +233,8 @@ async function apiRequest(path, opts = {}) {
 async function apiGetSession() {
   return apiRequest("/session");
 }
-async function apiSignup(email, password) {
-  return apiRequest("/signup", { method: "POST", body: { email: normalizeEmail(email), password } });
+async function apiSignup(email, password, phone) {
+  return apiRequest("/signup", { method: "POST", body: { email: normalizeEmail(email), password, phone } });
 }
 async function apiLogin(email, password) {
   return apiRequest("/login", { method: "POST", body: { email: normalizeEmail(email), password } });
@@ -659,6 +659,7 @@ function buildConfigJSON() {
       company: $("#company")?.value,
       contact: $("#contact")?.value,
       email: $("#email")?.value,
+      phone: $("#phone")?.value,
       quantity: state.qty,
     },
     pricing: {
@@ -698,6 +699,7 @@ function exportSpecsToPDF() {
     ['Company', cfg.order.company || ''],
     ['Contact', cfg.order.contact || ''],
     ['Email', cfg.order.email || ''],
+    ['Phone', cfg.order.phone || ''],
     ['Sign Type', cfg.colors.signType],
     ['Format', `${cfg.format.label || ''}`],
     ['Dimensions', `${cfg.format.dimensions.width}\" x ${cfg.format.dimensions.height}\"`],
@@ -849,12 +851,13 @@ async function generateProofPDFBlob() {
   const table = document.createElement('table');
   table.style.width = '100%';
   table.style.borderCollapse = 'collapse';
-  const specRows = [
-    ['Date', new Date(cfg.timestamp).toLocaleString()],
-    ['Company', cfg.order.company || ''],
-    ['Contact', cfg.order.contact || ''],
-    ['Email', cfg.order.email || ''],
-    ['Sign Type', cfg.colors.signType],
+    const specRows = [
+      ['Date', new Date(cfg.timestamp).toLocaleString()],
+      ['Company', cfg.order.company || ''],
+      ['Contact', cfg.order.contact || ''],
+      ['Email', cfg.order.email || ''],
+      ['Phone', cfg.order.phone || ''],
+      ['Sign Type', cfg.colors.signType],
     ['Format', `${cfg.format.label || ''}`],
     ['Dimensions', `${cfg.format.dimensions.width}\" x ${cfg.format.dimensions.height}\"`],
     ['Shape', cfg.format.shape || 'rect'],
@@ -945,6 +948,7 @@ async function composeQuoteEmailWithPDF(config, blob) {
     `Company: ${config.order.company || ''}`,
     `Contact: ${config.order.contact || ''}`,
     `Email: ${config.order.email || ''}`,
+    `Phone: ${config.order.phone || ''}`,
     '',
     `Sign Type: ${config.colors.signType}`,
     `Format: ${config.format.label}`,
@@ -1019,11 +1023,17 @@ function toggleTempPasswordDisplay(temp) {
 function switchAuthPanel(panelName) {
   activeAuthPanel = panelName || activeAuthPanel;
   const forceChange = !!(authState.user && authState.user.passwordChangeRequired);
+  const signedIn = !!authState.user;
   const panels = $$(".auth-panel");
   panels.forEach((panel) => {
     const name = panel.dataset.panel;
-    const target = forceChange ? "changePanel" : activeAuthPanel;
-    panel.classList.toggle("hidden", name !== target);
+    if (forceChange) {
+      panel.classList.toggle("hidden", name !== "changePanel");
+    } else if (signedIn) {
+      panel.classList.toggle("hidden", true);
+    } else {
+      panel.classList.toggle("hidden", name !== activeAuthPanel);
+    }
   });
 
   $$(".auth-tab").forEach((btn) => {
@@ -1037,6 +1047,7 @@ function renderAuthUI() {
   const logoutBtn = $("#logoutBtn");
   const user = authState.user;
   const isSignedIn = !!user;
+  const banner = $("#signedBanner");
   if (statusEl) {
     statusEl.textContent = isSignedIn
       ? `Signed in as ${user.email}${user.passwordChangeRequired ? " (update password)" : ""}`
@@ -1044,8 +1055,57 @@ function renderAuthUI() {
   }
   if (logoutBtn) logoutBtn.style.display = isSignedIn ? "inline-flex" : "none";
 
+  // Toggle banner
+  if (banner) {
+    if (isSignedIn) {
+      banner.textContent = `Signed in as ${user.email}`;
+      banner.classList.remove("hidden");
+    } else {
+      banner.classList.add("hidden");
+      banner.textContent = "";
+    }
+  }
+
+  // Hide auth tabs when signed in (unless forced change password)
+  const tabs = document.querySelector(".auth-tabs");
+  const panels = document.querySelectorAll(".auth-panel");
+  const forceChange = !!(user && user.passwordChangeRequired);
+
+  if (tabs) {
+    tabs.style.display = isSignedIn && !forceChange ? "none" : "flex";
+  }
+  panels.forEach((panel) => {
+    const name = panel.dataset.panel;
+    if (forceChange) {
+      panel.classList.toggle("hidden", name !== "changePanel");
+    } else if (isSignedIn) {
+      panel.classList.toggle("hidden", true);
+    } else {
+      panel.classList.toggle("hidden", name !== activeAuthPanel);
+    }
+  });
+
   switchAuthPanel(activeAuthPanel || "loginPanel");
   renderOrderHistory();
+}
+
+function prefillQuoteFromUser() {
+  const user = authState.user;
+  if (!user) return;
+  const emailEl = $("#email");
+  const phoneEl = $("#phone");
+  if (emailEl && user.email) {
+    if (!emailEl.value || emailEl.dataset.autofill === "true") {
+      emailEl.value = user.email;
+      emailEl.dataset.autofill = "true";
+    }
+  }
+  if (phoneEl && user.phone) {
+    if (!phoneEl.value || phoneEl.dataset.autofill === "true") {
+      phoneEl.value = user.phone;
+      phoneEl.dataset.autofill = "true";
+    }
+  }
 }
 
 function renderOrderHistory() {
@@ -1155,6 +1215,7 @@ async function handleLogin(email, password) {
     switchAuthPanel(activeAuthPanel);
     await refreshOrders();
     renderAuthUI();
+    prefillQuoteFromUser();
   } catch (err) {
     flashAuthMessage(err.message || "Could not sign in.", "error");
   }
@@ -1175,13 +1236,15 @@ async function handleSignup(email, password, confirm) {
     return;
   }
   try {
-    const data = await apiSignup(email, password);
+    const phone = $("#signupPhone")?.value;
+    const data = await apiSignup(email, password, phone);
     authState.user = data.user || null;
     flashAuthMessage(data.message || "Account created and signed in.", "success");
     activeAuthPanel = "loginPanel";
     switchAuthPanel(activeAuthPanel);
     await refreshOrders();
     renderAuthUI();
+    prefillQuoteFromUser();
   } catch (err) {
     flashAuthMessage(err.message || "Could not create account.", "error");
   }
@@ -1228,6 +1291,7 @@ async function handlePasswordChange(newPass, confirm) {
     switchAuthPanel(activeAuthPanel);
     await refreshOrders();
     renderAuthUI();
+    prefillQuoteFromUser();
   } catch (err) {
     flashAuthMessage(err.message || "Could not update password.", "error");
   }
@@ -1284,6 +1348,7 @@ async function refreshSession() {
     authState.user = null;
   }
   renderAuthUI();
+  prefillQuoteFromUser();
 }
 
 async function refreshOrders() {
@@ -1423,6 +1488,7 @@ function submitStockOrderEmail() {
   const company = document.getElementById('company')?.value || '';
   const contact = document.getElementById('contact')?.value || '';
   const email = document.getElementById('email')?.value || '';
+  const phone = document.getElementById('phone')?.value || '';
 
   const subject = `Stock Safety Tag Order: ${sel.label} x ${qty}`;
   const lines = [
@@ -1438,6 +1504,7 @@ function submitStockOrderEmail() {
     `Company: ${company}`,
     `Contact: ${contact}`,
     `Email: ${email}`,
+    `Phone: ${phone}`,
     '',
     'Comments / PO #:',
   ];

@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>User Profile - Mann Industrial Tags</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Roboto+Mono:wght@400;700&family=Oswald:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/site.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand" aria-label="Brand">
+        <div class="brand__logo" aria-hidden="true"></div>
+        <div class="brand__name">Mann Industrial Tags</div>
+      </div>
+      <nav aria-label="Primary">
+        <ul>
+          <li><a class="pill" href="index.html"><- Back to Configurator</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <div id="signedBanner" class="signed-banner hidden" role="status" aria-live="polite"></div>
+
+    <section class="auth-section" style="margin-top:16px">
+      <div class="card auth-card">
+        <div class="stack">
+          <div class="title">User Information</div>
+          <p class="small">Update your account details for faster quote requests and shipping.</p>
+
+          <div id="profileSignedOut" class="message warn" style="display:none">
+            Please sign in on the configurator page to manage your profile.
+          </div>
+
+          <form id="profileForm" class="stack" style="display:none">
+            <div class="row">
+              <div style="flex:1">
+                <label for="profileEmail">Primary Email</label>
+                <input id="profileEmail" type="email" disabled />
+              </div>
+              <div style="flex:1">
+                <label for="profileSecondaryEmail">Secondary Email</label>
+                <input id="profileSecondaryEmail" type="email" placeholder="optional" />
+              </div>
+            </div>
+
+            <div class="row">
+              <div style="flex:1">
+                <label for="profileCompany">Company</label>
+                <input id="profileCompany" type="text" placeholder="Company name" />
+              </div>
+              <div style="flex:1">
+                <label for="profileContact">Primary Contact</label>
+                <input id="profileContact" type="text" placeholder="Contact name" />
+              </div>
+            </div>
+
+            <div class="row">
+              <div style="flex:1">
+                <label for="profilePhone">Phone</label>
+                <input id="profilePhone" type="tel" placeholder="(555) 123-4567" />
+              </div>
+            </div>
+
+            <div class="title" style="margin:8px 0 0">Shipping Address</div>
+            <div class="row">
+              <div style="flex:1">
+                <label for="profileAddress">Address</label>
+                <input id="profileAddress" type="text" placeholder="Street address" />
+              </div>
+              <div style="flex:1">
+                <label for="profileSuite">Suite, Bldg, etc.</label>
+                <input id="profileSuite" type="text" placeholder="Suite / Apt / Bldg" />
+              </div>
+            </div>
+
+            <div class="row">
+              <div style="flex:1">
+                <label for="profileZip">ZIP Code</label>
+                <input id="profileZip" type="text" placeholder="ZIP / Postal" />
+              </div>
+              <div style="flex:1">
+                <label for="profileCity">City</label>
+                <select id="profileCity"></select>
+              </div>
+            </div>
+
+            <div class="row">
+              <div style="flex:1">
+                <label for="profileState">State, Province, etc.</label>
+                <select id="profileState"></select>
+              </div>
+              <div style="flex:1">
+                <label for="profileCountry">Country</label>
+                <select id="profileCountry"></select>
+              </div>
+            </div>
+
+            <div id="profileMessage" class="message" style="display:none"></div>
+
+            <div class="actions">
+              <button type="submit" class="btn">Save Information</button>
+              <a class="btn secondary" href="index.html">Back to Configurator</a>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card auth-card" id="resetCard" style="display:none">
+        <div class="stack">
+          <div class="title">Reset Password</div>
+          <p class="small">Set a new password while signed in.</p>
+          <form id="profileResetForm" class="stack">
+            <label for="resetNewPassword">New Password</label>
+            <input id="resetNewPassword" type="password" autocomplete="new-password" required />
+            <label for="resetConfirmPassword">Confirm New Password</label>
+            <input id="resetConfirmPassword" type="password" autocomplete="new-password" required />
+            <div id="resetMessage" class="message" style="display:none"></div>
+            <div class="actions">
+              <button type="submit" class="btn">Update Password</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="js/profile.js"></script>
+</body>
+</html>

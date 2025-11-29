@@ -41,7 +41,20 @@ function publicUser(user) {
   return user
     ? {
         email: user.email,
+        phone: user.phone || null,
         passwordChangeRequired: !!user.requirePasswordChange,
+        profile: {
+          company: user.company || "",
+          primaryContact: user.primaryContact || "",
+          phone: user.phone || "",
+          secondaryEmail: user.secondaryEmail || "",
+          address1: user.address1 || "",
+          address2: user.address2 || "",
+          zip: user.zip || "",
+          city: user.city || "",
+          state: user.state || "",
+          country: user.country || "",
+        },
       }
     : null;
 }
@@ -136,7 +149,7 @@ app.get("/api/session", (req, res) => {
 });
 
 app.post("/api/signup", async (req, res) => {
-  const { email, password } = req.body || {};
+  const { email, password, phone, company, primaryContact, secondaryEmail, shippingAddress } = req.body || {};
   const emailNorm = normalizeEmail(email);
   if (!emailNorm || typeof password !== "string" || password.length < 8) {
     return res.status(400).json({ error: "Email and password (min 8 chars) are required." });
@@ -149,6 +162,11 @@ app.post("/api/signup", async (req, res) => {
   const user = {
     id: generateId("u"),
     email: emailNorm,
+    phone: phone ? String(phone).trim() : null,
+    company: company ? String(company).trim() : "",
+    primaryContact: primaryContact ? String(primaryContact).trim() : "",
+    secondaryEmail: secondaryEmail ? normalizeEmail(secondaryEmail) : "",
+    shippingAddress: shippingAddress ? String(shippingAddress).trim() : "",
     passwordHash,
     tempPasswordHash: null,
     requirePasswordChange: false,
@@ -231,6 +249,41 @@ app.post("/api/password/update", requireAuth, async (req, res) => {
   req.user.requirePasswordChange = false;
   save();
   res.json({ user: publicUser(req.user), message: "Password updated." });
+});
+
+function profileView(user) {
+  return {
+    company: user.company || "",
+    primaryContact: user.primaryContact || "",
+    phone: user.phone || "",
+    secondaryEmail: user.secondaryEmail || "",
+    address1: user.address1 || "",
+    address2: user.address2 || "",
+    zip: user.zip || "",
+    city: user.city || "",
+    state: user.state || "",
+    country: user.country || "",
+  };
+}
+
+app.get("/api/profile", requireAuth, (req, res) => {
+  res.json({ profile: profileView(req.user) });
+});
+
+app.post("/api/profile", requireAuth, (req, res) => {
+  const { company, primaryContact, phone, secondaryEmail, shippingAddress } = req.body || {};
+  req.user.company = company ? String(company).trim() : "";
+  req.user.primaryContact = primaryContact ? String(primaryContact).trim() : "";
+  req.user.phone = phone ? String(phone).trim() : "";
+  req.user.secondaryEmail = secondaryEmail ? normalizeEmail(secondaryEmail) : "";
+  req.user.address1 = req.body?.address1 ? String(req.body.address1).trim() : "";
+  req.user.address2 = req.body?.address2 ? String(req.body.address2).trim() : "";
+  req.user.zip = req.body?.zip ? String(req.body.zip).trim() : "";
+  req.user.city = req.body?.city ? String(req.body.city).trim() : "";
+  req.user.state = req.body?.state ? String(req.body.state).trim() : "";
+  req.user.country = req.body?.country ? String(req.body.country).trim() : "";
+  save();
+  res.json({ profile: profileView(req.user), user: publicUser(req.user), message: "Profile updated." });
 });
 
 app.get("/api/orders", requireAuth, (req, res) => {

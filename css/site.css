@@ -148,6 +148,19 @@ textarea{ min-height:80px; resize:vertical }
 .message.info{ border-color:var(--brand); color:var(--ink) }
 .message.warn{ border-color:#f59e0b; color:#f59e0b }
 
+.signed-banner{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid var(--border);
+  background:#0f131a;
+  color:var(--ink);
+  margin:8px 0 12px;
+}
+.hidden{ display:none !important }
+
 /* ========== Format cards ========== */
 .formats {
   position: relative;

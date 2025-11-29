@@ -23,9 +23,12 @@
       <nav aria-label="Primary">
         <ul>
           <li><span class="pill">Lead time: 10-14 business days after proof</span></li>
+          <li><a class="pill" href="profile.html">User Info</a></li>
         </ul>
       </nav>
     </header>
+
+    <div id="signedBanner" class="signed-banner hidden" role="status" aria-live="polite"></div>
 
     <!-- Account & Orders -->
     <section id="account" class="auth-section">
@@ -57,6 +60,8 @@
             <form id="signupForm" class="auth-panel hidden" data-panel="signupPanel">
               <label for="signupEmail">Email</label>
               <input id="signupEmail" name="signupEmail" type="email" required autocomplete="email" />
+              <label for="signupPhone">Phone (optional)</label>
+              <input id="signupPhone" name="signupPhone" type="tel" autocomplete="tel" />
               <label for="signupPassword">Password</label>
               <input id="signupPassword" name="signupPassword" type="password" required autocomplete="new-password" />
               <label for="signupConfirm">Confirm Password</label>
@@ -291,6 +296,12 @@
                   <input id="email" name="email" type="email" required />
                 </div>
                 <div style="flex:1">
+                  <label for="phone">Phone (optional)</label>
+                  <input id="phone" name="phone" type="tel" />
+                </div>
+              </div>
+              <div class="row">
+                <div style="flex:1">
                   <label for="qty">Quantity</label>
                   <input id="qty" name="qty" type="number" min="1" step="1" value="1" required />
                   <div class="small">Custom/phenolic: any quantity. Stock tags: packs of 25.</div>
@@ -310,9 +321,9 @@
 
     <section id="stock-tags" style="margin-top:28px">
   <div class="card" style="padding:16px 16px 20px">
-    <div class="title" style="margin-bottom:8px">Stock Safety Tags — 3&quot; × 5&quot;</div>
+    <div class="title" style="margin-bottom:8px">Stock Safety Tags - 3&quot; x 5&quot;</div>
     <p class="small" style="margin-bottom:16px">
-      Durable 3&quot; × 5&quot; tags, sold in sets of 25 minimum. Choose a design below and request a quote.
+      Durable 3&quot; x 5&quot; tags, sold in sets of 25 minimum. Choose a design below and request a quote.
     </p>
 
     <div class="grid cols-3" id="tagGrid" style="margin-bottom:16px">
@@ -345,8 +356,7 @@
   </div>
 </section>
 
-
-    <p class="footer">© <span id="year"></span> Acme Industrial Tags. Custom items are non-returnable; defects replaced per policy.</p>
+    <p class="footer">(c) <span id="year"></span> Acme Industrial Tags. Custom items are non-returnable; defects replaced per policy.</p>
   </div>
 
   <script src="js/site.js"></script>
