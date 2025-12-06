@@ -4,6 +4,7 @@ const fs = require("fs");
 const crypto = require("crypto");
 const cookieParser = require("cookie-parser");
 const bcrypt = require("bcryptjs");
+const QuoteEngine = require("../shared/quote-engine");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,6 +12,8 @@ const DATA_DIR = path.join(__dirname, "data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
 const SESSION_COOKIE = "sid";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
+const ORDER_LOG_MAX = 500;
+const DELETED_RETENTION_MS = 1000 * 60 * 60 * 24 * 15; // 15 days
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -28,6 +31,8 @@ function writeDB(db) {
 }
 
 const db = readDB();
+db.orderLog = Array.isArray(db.orderLog) ? db.orderLog : [];
+db.orderIndex = db.orderIndex && typeof db.orderIndex === "object" ? db.orderIndex : {};
 
 function save() {
   writeDB(db);
@@ -114,6 +119,23 @@ function sendTempPassword(email, tempPassword) {
   console.log(`Password reset for ${email}: temporary password is "${tempPassword}"`);
 }
 
+function normalizeOrderStatus(status) {
+  return QuoteEngine.OrderStateMachine.normalize(status);
+}
+
+function logOrderForBusiness(order, userId) {
+  if (!order || !order.id) return;
+  const entry = QuoteEngine.orderLogEntry(order, userId);
+  db.orderLog.unshift(entry);
+  db.orderIndex[entry.id] = entry;
+  if (db.orderLog.length > ORDER_LOG_MAX) {
+    const removed = db.orderLog.splice(ORDER_LOG_MAX);
+    removed.forEach((r) => {
+      if (r && r.id) delete db.orderIndex[r.id];
+    });
+  }
+}
+
 function requireAuth(req, res, next) {
   if (!req.user) return res.status(401).json({ error: "Not signed in." });
   next();
@@ -127,6 +149,8 @@ app.use((req, _res, next) => {
   const token = req.cookies[SESSION_COOKIE];
   const user = getSessionUser(token);
   if (user) {
+    user.orders = Array.isArray(user.orders) ? user.orders : [];
+    user.deletedOrders = Array.isArray(user.deletedOrders) ? user.deletedOrders : [];
     req.user = user;
     req.sessionToken = token;
   } else {
@@ -171,6 +195,7 @@ app.post("/api/signup", async (req, res) => {
     tempPasswordHash: null,
     requirePasswordChange: false,
     orders: [],
+    deletedOrders: [],
     createdAt: new Date().toISOString(),
   };
   db.users.push(user);
@@ -291,26 +316,84 @@ app.get("/api/orders", requireAuth, (req, res) => {
   res.json({ orders });
 });
 
+app.get("/api/order-log/:id", requireAuth, (req, res) => {
+  const id = req.params?.id;
+  if (!id) return res.status(400).json({ error: "Order id is required." });
+  const entry = db.orderIndex[id];
+  if (!entry || entry.userId !== req.user.id) {
+    return res.status(404).json({ error: "Order not found for this account." });
+  }
+  res.json({ order: entry });
+});
+
+function pruneDeleted(user) {
+  const cutoff = Date.now() - DELETED_RETENTION_MS;
+  const before = Array.isArray(user.deletedOrders) ? user.deletedOrders.length : 0;
+  user.deletedOrders = (user.deletedOrders || []).filter((o) => {
+    const ts = new Date(o.deletedAt || 0).getTime();
+    return ts >= cutoff;
+  });
+  return before !== user.deletedOrders.length;
+}
+
 app.post("/api/orders", requireAuth, (req, res) => {
   const order = req.body?.order;
   if (!order || typeof order !== "object") {
     return res.status(400).json({ error: "Order payload is required." });
   }
+
+  const qtyRaw = Number(order.qty || order.quantity || 0);
+  const qty = Number.isFinite(qtyRaw) && qtyRaw > 0 ? qtyRaw : 1;
+  const categoryHint = order.kind === "stock" ? "non_phenolic" : (order.config?.colors?.signType || order.signType);
+  const quote = QuoteEngine.computeQuote({
+    category: categoryHint === "non_phenolic" ? "non_phenolic" : undefined,
+    signType: order.config?.colors?.signType || order.signType || "custom",
+    qty,
+    format: order.config?.format,
+  });
+
+  const status = normalizeOrderStatus(order.status);
   const newOrder = {
     id: order.id || generateId("ord"),
     createdAt: new Date().toISOString(),
     kind: order.kind || "custom",
     title: order.title || "Order",
-    qty: Number(order.qty || order.quantity || 0),
-    total: order.total != null ? Number(order.total) : null,
+    qty: quote.qty || qty,
+    total: order.total != null ? Number(order.total) : (quote.estimatedTotal != null ? Number(quote.estimatedTotal) : null),
+    status,
     summary: order.summary || order.detail || "",
     config: order.config || null,
+    quote,
   };
   req.user.orders = Array.isArray(req.user.orders) ? req.user.orders : [];
   req.user.orders.unshift(newOrder);
   req.user.orders = req.user.orders.slice(0, 50);
+  logOrderForBusiness({ ...newOrder, userId: req.user.id }, req.user.id);
   save();
   res.json({ order: newOrder, message: "Order saved." });
+});
+
+app.delete("/api/orders/:id", requireAuth, (req, res) => {
+  const id = req.params?.id;
+  if (!id) return res.status(400).json({ error: "Order id is required." });
+  req.user.orders = Array.isArray(req.user.orders) ? req.user.orders : [];
+  const idx = req.user.orders.findIndex((o) => o.id === id);
+  if (idx === -1) {
+    return res.status(404).json({ error: "Order not found." });
+  }
+  const [removed] = req.user.orders.splice(idx, 1);
+  pruneDeleted(req.user);
+  req.user.deletedOrders = Array.isArray(req.user.deletedOrders) ? req.user.deletedOrders : [];
+  req.user.deletedOrders.unshift({ ...removed, deletedAt: new Date().toISOString() });
+  req.user.deletedOrders = req.user.deletedOrders.slice(0, 50);
+  save();
+  res.json({ ok: true, message: "Order moved to recently deleted." });
+});
+
+app.get("/api/orders/deleted", requireAuth, (req, res) => {
+  const changed = pruneDeleted(req.user);
+  if (changed) save();
+  res.json({ orders: Array.isArray(req.user.deletedOrders) ? req.user.deletedOrders : [] });
 });
 
 // Fallback to index for any non-API route (optional)

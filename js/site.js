@@ -50,15 +50,10 @@ const FORMATS = [
 ];
 
 // ============================================================================
-// PRICING LOGIC
-// Rules:
-// - Custom tags: no price shown
-// - Preset phenolic (assets/phenolic): price by size map
-// - Preset non-phenolic (assets/tags): sold in sets of 25 for $49.75
+// PRICING LOGIC (shared with server via QuoteEngine)
 // ============================================================================
-const PRICING = {
+const PRICING = (typeof QuoteEngine !== "undefined" && QuoteEngine.PRICING) ? QuoteEngine.PRICING : {
   phenolicPresetPrices: {
-    // width x height (smaller first)
     '1x3': 2.97,
     '1.5x4.5': 6.75,
     '2x6': 11.88,
@@ -67,24 +62,13 @@ const PRICING = {
   },
   nonPhenolicSetPrice: 49.75,
   setSize: 25,
+  currency: 'USD',
 };
 
-function formatDimKey(n) {
-  const rounded = Math.round(n * 100) / 100;
-  const intish = Math.abs(rounded - Math.round(rounded)) < 1e-9;
-  return intish ? String(Math.round(rounded)) : String(rounded);
-}
-
-function sizeKeyForFormat(f) {
-  if (!f) return null;
-  const a = Number(f.w), b = Number(f.h);
-  if (!isFinite(a) || !isFinite(b)) return null;
-  const sm = Math.min(a, b);
-  const lg = Math.max(a, b);
-  return `${formatDimKey(sm)}x${formatDimKey(lg)}`;
-}
-
 function currentCategory() {
+  if (typeof QuoteEngine !== "undefined" && QuoteEngine.classifyCategory) {
+    return QuoteEngine.classifyCategory(state.signType, SIGN_IMAGES);
+  }
   if (state.signType === 'custom') return 'custom';
   const path = SIGN_IMAGES[state.signType] || '';
   if (path.includes('assets/phenolic/')) return 'phenolic';
@@ -92,46 +76,39 @@ function currentCategory() {
   return 'unknown';
 }
 
-function phenolicUnitPriceForCurrentFormat() {
-  const key = sizeKeyForFormat(fmt());
-  if (!key) return null;
-  const val = PRICING.phenolicPresetPrices[key];
-  return typeof val === 'number' ? val : null;
-}
-
 function phenolicUnitPriceForFormat(f) {
-  const key = sizeKeyForFormat(f);
-  if (!key) return null;
-  const val = PRICING.phenolicPresetPrices[key];
-  return typeof val === 'number' ? val : null;
+  if (typeof QuoteEngine !== "undefined" && QuoteEngine.priceForFormat) {
+    return QuoteEngine.priceForFormat(f);
+  }
+  return null;
 }
 
 // Normalize to packs of 25
 function normalizePacks(n) {
-  const qty = parseInt(n, 10) || 25;
-  return Math.max(25, Math.ceil(qty / 25) * 25);
+  if (typeof QuoteEngine !== "undefined" && QuoteEngine.normalizePacks) {
+    return QuoteEngine.normalizePacks(n, PRICING.setSize);
+  }
+  const qty = parseInt(n, 10) || PRICING.setSize;
+  return Math.max(PRICING.setSize, Math.ceil(qty / PRICING.setSize) * PRICING.setSize);
+}
+
+function computeQuoteFromState() {
+  if (typeof QuoteEngine === "undefined" || !QuoteEngine.computeQuote) return { estimatedTotal: null };
+  let qty = parseInt(state.qty, 10) || 1;
+  qty = Math.max(1, qty);
+  state.qty = qty; // sync UI
+  return QuoteEngine.computeQuote({
+    signType: state.signType,
+    qty: state.qty,
+    format: fmt(),
+    signImages: SIGN_IMAGES,
+  });
 }
 
 // Calculate price estimate
 function estimatePrice() {
-  let qty = parseInt(state.qty, 10) || 1;
-  qty = Math.max(1, qty);
-  state.qty = qty; // Sync UI
-
-  const cat = currentCategory();
-  if (cat === 'custom') {
-    return null; // no price shown for custom designs
-  }
-  if (cat === 'phenolic') {
-    const unit = phenolicUnitPriceForCurrentFormat();
-    if (unit == null) return null; // unknown size -> no price
-    return unit * qty;
-  }
-  if (cat === 'non_phenolic') {
-    const sets = Math.ceil(qty / PRICING.setSize);
-    return sets * PRICING.nonPhenolicSetPrice;
-  }
-  return null;
+  const quote = computeQuoteFromState();
+  return (quote && typeof quote.estimatedTotal === 'number') ? quote.estimatedTotal : null;
 }
 
 // ============================================================================
@@ -187,7 +164,30 @@ const authState = {
   user: null, // { email, phone, passwordChangeRequired }
   orders: [],
   latestResetTemp: null, // demo-only temp password surface
+  deletedOrders: [],
 };
+
+const viewState = {
+  savedOpen: true,
+  deletedOpen: false,
+};
+
+async function performLogout() {
+  try {
+    await apiLogout();
+  } catch (_) {
+    /* swallow */
+  }
+  authState.user = null;
+  authState.orders = [];
+  authState.deletedOrders = [];
+  authState.latestResetTemp = null;
+  toggleTempPasswordDisplay(null);
+  flashAuthMessage("Signed out.", "info");
+  activeAuthPanel = "loginPanel";
+  switchAuthPanel(activeAuthPanel);
+  renderAuthUI();
+}
 
 // ============================================================================
 // DOM HELPERS
@@ -254,6 +254,12 @@ async function apiListOrders() {
 async function apiCreateOrder(order) {
   return apiRequest("/orders", { method: "POST", body: { order } });
 }
+async function apiDeleteOrder(id) {
+  return apiRequest(`/orders/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+async function apiListDeletedOrders() {
+  return apiRequest("/orders/deleted");
+}
 
 // Apply text case transformation
 function applyCase(str) {
@@ -284,7 +290,7 @@ function renderFormatCards() {
     }
 
     const unit = currentCategory() === 'phenolic' ? phenolicUnitPriceForFormat(f) : null;
-    const badge = unit != null ? `Base $${unit.toFixed(2)}` : 'N/A';
+    const badge = unit != null ? `<span class="badge mono">Base $${unit.toFixed(2)}</span>` : '';
     el.innerHTML = `
       <div style="flex:0 0 64px;display:grid;place-items:center">
         ${previewThumbSVG(f)}
@@ -293,7 +299,7 @@ function renderFormatCards() {
         <div class="title">${f.label}</div>
         <div class="small">${f.shape === 'circle' ? 'Round equipment/valve tag' : 'Panel/plate label'}</div>
       </div>
-      <span class="badge mono">${badge}</span>
+      ${badge}
     `;
 
     el.addEventListener("click", () => {
@@ -430,45 +436,38 @@ function renderCustomTagSVG(svg, f) {
     });
   }
 
-  // Text content
-  const line1 = applyCase(state.line1 || '');
-  const line2 = applyCase(state.line2 || '');
-  const hasL1 = line1.length > 0;
-  const hasL2 = line2.length > 0;
+  // Text layout: binary-search font size to fit width via shared QuoteEngine
+  const rawLines = [applyCase(state.line1 || ''), applyCase(state.line2 || '')].filter(Boolean);
+  const lines = rawLines.length ? rawLines : ['Your Text'];
   const fill = state.textColor === 'auto' ? state.coreColor : state.textColor;
+  let layouts = (typeof QuoteEngine !== "undefined" && QuoteEngine.layoutTag)
+    ? QuoteEngine.layoutTag({
+        viewBox: { x: vx, y: vy, width: vw, height: vh },
+        lines,
+        fontFamily: state.font,
+        fontWeight: 700,
+        maxLines: 2,
+      })
+    : [];
+  if (!layouts.length) {
+    const midX = vx + vw / 2;
+    const midY = vy + vh * 0.54;
+    layouts = [{ text: lines[0], x: midX, y: midY, fontSize: vh * 0.2, fontWeight: 700 }];
+  }
 
-  const midX = vx + vw / 2;
-
-  function addText(txt, yPct, weight = 700) {
+  layouts.forEach((info, idx) => {
     const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    const baseSize = vh * 0.24; // base size as fraction of height
-    const n = Math.max(1, txt.length);
-    // approximate char width factor ~0.6 of font-size
-    const maxWidth = vw * 0.88;
-    let fs = Math.min(baseSize, maxWidth / (n * 0.6));
-    fs = Math.max(10, fs);
-    t.setAttribute('x', String(midX));
-    t.setAttribute('y', String(vy + vh * yPct));
+    t.setAttribute('x', String(info.x));
+    t.setAttribute('y', String(info.y));
     t.setAttribute('fill', fill);
-    t.setAttribute('font-family', state.font);
-    t.setAttribute('font-size', String(fs));
-    t.setAttribute('font-weight', String(weight));
-    t.setAttribute('text-anchor', 'middle');
+    t.setAttribute('font-family', info.fontFamily || state.font);
+    t.setAttribute('font-size', String(info.fontSize || 14));
+    t.setAttribute('font-weight', String(info.fontWeight || (idx === 0 ? 700 : 600)));
+    t.setAttribute('text-anchor', info.anchor || 'middle');
     t.setAttribute('dominant-baseline', 'middle');
-    t.textContent = txt;
+    t.textContent = info.text;
     svg.appendChild(t);
-  }
-
-  if (hasL1 && hasL2) {
-    addText(line1, 0.43, 700);
-    addText(line2, 0.65, 600);
-  } else if (hasL1) {
-    addText(line1, 0.54, 700);
-  } else if (hasL2) {
-    addText(line2, 0.54, 700);
-  } else {
-    addText('Your Text', 0.54, 600);
-  }
+  });
 }
 
 // ============================================================================
@@ -629,6 +628,7 @@ function bindFormActions() {
 // Build complete configuration object
 function buildConfigJSON() {
   const f = fmt();
+  const quote = computeQuoteFromState();
   return {
     timestamp: new Date().toISOString(),
     format: {
@@ -663,8 +663,10 @@ function buildConfigJSON() {
       quantity: state.qty,
     },
     pricing: {
-      estimatedTotal: (typeof estimatePrice() === 'number') ? estimatePrice().toFixed(2) : null,
-      currency: "USD",
+      category: quote?.category || currentCategory(),
+      estimatedTotal: (quote && typeof quote.estimatedTotal === 'number') ? quote.estimatedTotal.toFixed(2) : null,
+      currency: quote?.currency || "USD",
+      breakdown: quote?.breakdown || {},
     },
     preview: {
       imageUsed: SIGN_IMAGES[state.signType],
@@ -1045,6 +1047,7 @@ function switchAuthPanel(panelName) {
 function renderAuthUI() {
   const statusEl = $("#authStatus");
   const logoutBtn = $("#logoutBtn");
+  const topLogoutBtn = $("#topLogoutBtn");
   const user = authState.user;
   const isSignedIn = !!user;
   const banner = $("#signedBanner");
@@ -1054,6 +1057,7 @@ function renderAuthUI() {
       : "Signed out";
   }
   if (logoutBtn) logoutBtn.style.display = isSignedIn ? "inline-flex" : "none";
+  if (topLogoutBtn) topLogoutBtn.style.display = isSignedIn ? "inline-flex" : "none";
 
   // Toggle banner
   if (banner) {
@@ -1087,6 +1091,11 @@ function renderAuthUI() {
 
   switchAuthPanel(activeAuthPanel || "loginPanel");
   renderOrderHistory();
+
+  const accountCard = document.getElementById("accountAccessCard");
+  if (accountCard) {
+    accountCard.style.display = isSignedIn ? "none" : "block";
+  }
 }
 
 function prefillQuoteFromUser() {
@@ -1112,6 +1121,9 @@ function renderOrderHistory() {
   const list = $("#orderHistoryList");
   const empty = $("#orderHistoryEmpty");
   if (!list || !empty) return;
+  const open = viewState.savedOpen !== false;
+  list.style.display = open ? "" : "none";
+  empty.style.display = open ? "" : "none";
 
   list.innerHTML = "";
 
@@ -1139,14 +1151,25 @@ function renderOrderHistory() {
     const title = document.createElement("div");
     title.className = "order-title";
     title.textContent = ord.title || "Order";
+    const status = (ord.status || "draft").toUpperCase();
+    const statusBadge = document.createElement("span");
+    statusBadge.className = "badge";
+    statusBadge.textContent = status;
     const badge = document.createElement("span");
     badge.className = "badge mono";
     badge.textContent = `${ord.kind === "stock" ? "Stock" : "Custom"} - Qty ${ord.qty || ord.quantity || 0}`;
     titleRow.appendChild(title);
+    titleRow.appendChild(statusBadge);
     titleRow.appendChild(badge);
 
     const meta = document.createElement("div");
     meta.className = "order-meta";
+    if (ord.id) {
+      const oid = document.createElement("span");
+      oid.className = "mono";
+      oid.textContent = ord.id;
+      meta.appendChild(oid);
+    }
     const when = document.createElement("span");
     when.textContent = new Date(ord.createdAt || Date.now()).toLocaleString();
     const price = document.createElement("span");
@@ -1160,10 +1183,84 @@ function renderOrderHistory() {
 
     item.appendChild(titleRow);
     item.appendChild(meta);
+
+    const actions = document.createElement("div");
+    actions.className = "order-actions";
+    const loadBtn = document.createElement("button");
+    loadBtn.type = "button";
+    loadBtn.className = "btn secondary";
+    loadBtn.textContent = "Load specs";
+    loadBtn.addEventListener("click", () => {
+      applySavedOrder(ord);
+    });
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "btn secondary";
+    delBtn.style.borderColor = "var(--danger)";
+    delBtn.style.color = "var(--danger)";
+    delBtn.textContent = "Delete";
+    delBtn.addEventListener("click", () => {
+      confirmDeleteOrder(ord);
+    });
+    actions.appendChild(loadBtn);
+    actions.appendChild(delBtn);
+    item.appendChild(actions);
+
     frag.appendChild(item);
   });
 
   list.appendChild(frag);
+  updateOrderSectionButtons();
+}
+
+function renderDeletedOrders() {
+  const list = $("#orderDeletedList");
+  const empty = $("#orderDeletedEmpty");
+  if (!list || !empty) return;
+  const open = viewState.deletedOpen === true;
+  list.style.display = open ? "" : "none";
+  empty.style.display = open ? "" : "none";
+  list.innerHTML = "";
+
+  const orders = Array.isArray(authState.deletedOrders) ? authState.deletedOrders : [];
+  if (!orders.length) {
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+  const frag = document.createDocumentFragment();
+  orders.forEach((ord) => {
+    const item = document.createElement("div");
+    item.className = "order-item deleted";
+
+    const titleRow = document.createElement("div");
+    titleRow.className = "order-top";
+    const title = document.createElement("div");
+    title.className = "order-title";
+    title.textContent = ord.title || "Order";
+    const badge = document.createElement("span");
+    badge.className = "badge";
+    badge.textContent = (ord.status || "deleted").toUpperCase();
+    titleRow.appendChild(title);
+    titleRow.appendChild(badge);
+    item.appendChild(titleRow);
+
+    const meta = document.createElement("div");
+    meta.className = "order-meta";
+    const when = document.createElement("span");
+    const ts = ord.deletedAt || ord.createdAt;
+    when.textContent = `Deleted: ${new Date(ts || Date.now()).toLocaleString()}`;
+    const price = document.createElement("span");
+    const total = typeof ord.total === "number" ? ord.total : parseFloat(ord.total);
+    price.textContent = isFinite(total) ? `$${total.toFixed(2)}` : "No estimate";
+    meta.appendChild(when);
+    meta.appendChild(price);
+    item.appendChild(meta);
+
+    frag.appendChild(item);
+  });
+  list.appendChild(frag);
+  updateOrderSectionButtons();
 }
 
 async function persistOrderToServer(order) {
@@ -1184,11 +1281,99 @@ function recordCustomOrder(config) {
     qty: config.order.quantity,
     total: config.pricing.estimatedTotal ? Number(config.pricing.estimatedTotal) : null,
     summary: [config.text.line1, config.text.line2].filter(Boolean).join(" / "),
+    status: (typeof QuoteEngine !== "undefined" && QuoteEngine.OrderStateMachine)
+      ? QuoteEngine.OrderStateMachine.normalize("proofed")
+      : "proofed",
     config,
   };
   persistOrderToServer(order);
 }
 
+function applySavedOrder(order) {
+  if (!order || !order.config) {
+    showMessage("No saved specs attached to this order.", "error");
+    return;
+  }
+  const cfg = order.config;
+  const fmtId = cfg.format?.id;
+  if (fmtId && FORMATS.find((f) => f.id === fmtId)) {
+    state.formatId = fmtId;
+  }
+  state.signType = cfg.colors?.signType || state.signType;
+  state.line1 = cfg.text?.line1 || "";
+  state.line2 = cfg.text?.line2 || "";
+  state.font = cfg.text?.font || state.font;
+  state.textCase = cfg.text?.case || state.textCase;
+  state.topColor = cfg.colors?.top || state.topColor;
+  state.coreColor = cfg.colors?.core || state.coreColor;
+  state.textColor = cfg.colors?.text || state.textColor;
+  state.outline = cfg.colors?.outline || state.outline;
+  state.hole = cfg.options?.hole || state.hole;
+  state.adhesive = cfg.options?.adhesive || state.adhesive;
+  state.thickness = cfg.options?.thickness || state.thickness;
+  state.qty = cfg.order?.quantity || order.qty || state.qty;
+  state.stockSelectedId = cfg.stock?.id || state.stockSelectedId;
+  state.stockQty = cfg.order?.quantity || state.stockQty;
+
+  const setVal = (sel, val) => {
+    const el = $(sel);
+    if (el && val != null) el.value = val;
+  };
+  setVal("#signType", state.signType);
+  setVal("#formatSelect", state.formatId);
+  setVal("#line1", state.line1);
+  setVal("#line2", state.line2);
+  setVal("#fontFamily", state.font);
+  setVal("#textCase", state.textCase);
+  setVal("#topColor", state.topColor);
+  setVal("#coreColor", state.coreColor);
+  setVal("#textColor", state.textColor);
+  setVal("#outline", state.outline);
+  setVal("#holeOpt", state.hole);
+  setVal("#adhesiveOpt", state.adhesive);
+  setVal("#thickness", state.thickness);
+  setVal("#qty", state.qty);
+  setVal("#stockQty", state.stockQty);
+
+  updateAll();
+  if (state.signType !== "custom") {
+    removeCustomSVG();
+  }
+  showMessage("Loaded saved specs from order.", "success");
+  document.getElementById("config")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function confirmDeleteOrder(order) {
+  if (!order || !order.id) return;
+  const ok = window.confirm("Delete this order from history? It will move to Recently Deleted for 15 days.");
+  if (!ok) return;
+  try {
+    await apiDeleteOrder(order.id);
+    showMessage("Order moved to Recently Deleted.", "success");
+    await refreshOrders();
+  } catch (err) {
+    showMessage(err.message || "Could not delete order.", "error");
+  }
+}
+
+function updateOrderSectionButtons() {
+  const savedBtn = $("#toggleSavedOrders");
+  const deletedBtn = $("#toggleDeletedOrders");
+  if (savedBtn) savedBtn.textContent = viewState.savedOpen ? "Collapse" : "Expand";
+  if (deletedBtn) deletedBtn.textContent = viewState.deletedOpen ? "Collapse" : "Expand";
+}
+
+function bindOrderSectionToggles() {
+  $("#toggleSavedOrders")?.addEventListener("click", () => {
+    viewState.savedOpen = !viewState.savedOpen;
+    renderOrderHistory();
+  });
+  $("#toggleDeletedOrders")?.addEventListener("click", () => {
+    viewState.deletedOpen = !viewState.deletedOpen;
+    renderDeletedOrders();
+  });
+  updateOrderSectionButtons();
+}
 function recordStockOrder(sel, qty, total) {
   if (!authState.user) return;
   const order = {
@@ -1197,6 +1382,18 @@ function recordStockOrder(sel, qty, total) {
     qty,
     total,
     summary: `Image: ${sel.img}`,
+    status: (typeof QuoteEngine !== "undefined" && QuoteEngine.OrderStateMachine)
+      ? QuoteEngine.OrderStateMachine.normalize("submitted")
+      : "submitted",
+    config: {
+      format: null,
+      text: { line1: sel.label, line2: "", font: state.font, case: state.textCase },
+      colors: { signType: "stock", top: null, core: null, text: null, outline: null },
+      options: { hole: null, adhesive: null, thickness: null },
+      order: { quantity: qty },
+      pricing: { estimatedTotal: total, currency: PRICING.currency },
+      stock: { id: sel.id, img: sel.img, label: sel.label },
+    },
   };
   persistOrderToServer(order);
 }
@@ -1325,19 +1522,15 @@ function bindAuthUI() {
     await handlePasswordChange($("#newPassword")?.value, $("#confirmPassword")?.value);
   });
 
-  $("#logoutBtn")?.addEventListener("click", async () => {
-    try {
-      await apiLogout();
-    } catch (_) { /* swallow */ }
-    authState.user = null;
-    authState.orders = [];
-    authState.latestResetTemp = null;
-    toggleTempPasswordDisplay(null);
-    flashAuthMessage("Signed out.", "info");
-    activeAuthPanel = "loginPanel";
-    switchAuthPanel(activeAuthPanel);
-    renderAuthUI();
-  });
+  const bindLogout = (id) => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.addEventListener("click", async () => {
+      await performLogout();
+    });
+  };
+  bindLogout("logoutBtn");
+  bindLogout("topLogoutBtn");
 }
 
 async function refreshSession() {
@@ -1354,16 +1547,21 @@ async function refreshSession() {
 async function refreshOrders() {
   if (!authState.user) {
     authState.orders = [];
+    authState.deletedOrders = [];
     renderOrderHistory();
+    renderDeletedOrders();
     return;
   }
   try {
     const data = await apiListOrders();
     authState.orders = Array.isArray(data.orders) ? data.orders : [];
+    const deleted = await apiListDeletedOrders();
+    authState.deletedOrders = Array.isArray(deleted.orders) ? deleted.orders : [];
   } catch (err) {
     flashAuthMessage(err.message || "Could not load orders.", "error");
   }
   renderOrderHistory();
+  renderDeletedOrders();
 }
 
 async function initAuth() {
@@ -1400,6 +1598,7 @@ function init() {
   bindFormActions();
   // Stock safety tags events
   bindStockTagControls();
+  bindOrderSectionToggles();
   initAuth();
   updateAll();
 }
@@ -1466,12 +1665,14 @@ function updateStockTagPreviewAndPrice() {
     img.alt = `${sel.label} stock tag`;
   }
 
-  const qty = normalizePacks(state.stockQty || 25);
-  state.stockQty = qty;
-  const sets = Math.ceil(qty / PRICING.setSize);
-  const total = sets * PRICING.nonPhenolicSetPrice;
+  const qty = normalizePacks(state.stockQty || PRICING.setSize);
+  const quote = (typeof QuoteEngine !== "undefined" && QuoteEngine.computeQuote)
+    ? QuoteEngine.computeQuote({ category: 'non_phenolic', qty })
+    : { qty, estimatedTotal: null };
+  state.stockQty = quote.qty || qty;
+  const total = quote.estimatedTotal;
   const est = document.getElementById('stockTagEstimate');
-  if (est) est.textContent = `$${total.toFixed(2)}`;
+  if (est) est.textContent = (typeof total === 'number') ? `$${total.toFixed(2)}` : 'N/A';
 }
 
 function submitStockOrderEmail() {
@@ -1479,8 +1680,11 @@ function submitStockOrderEmail() {
   if (!sel) return;
 
   const qty = normalizePacks(state.stockQty || PRICING.setSize);
-  const sets = Math.ceil(qty / PRICING.setSize);
-  const total = sets * PRICING.nonPhenolicSetPrice;
+  const quote = (typeof QuoteEngine !== "undefined" && QuoteEngine.computeQuote)
+    ? QuoteEngine.computeQuote({ category: 'non_phenolic', qty })
+    : { qty, estimatedTotal: null, breakdown: { sets: Math.ceil(qty / PRICING.setSize), setSize: PRICING.setSize } };
+  const sets = quote.breakdown?.sets || Math.ceil(qty / PRICING.setSize);
+  const total = quote.estimatedTotal;
 
   // Save to user history if signed in
   recordStockOrder(sel, qty, total);
@@ -1498,7 +1702,7 @@ function submitStockOrderEmail() {
     `Image: ${sel.img}`,
     `Quantity (units): ${qty}`,
     `Sets of ${PRICING.setSize}: ${sets}`,
-    `Estimated Total: $${total.toFixed(2)} USD`,
+    `Estimated Total: ${typeof total === 'number' ? '$' + total.toFixed(2) + ' USD' : 'N/A'}`,
     '',
     'Customer Information',
     `Company: ${company}`,

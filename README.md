@@ -64,3 +64,10 @@ npm run dev    # starts server at http://localhost:3000 serving the static site 
 - Reset emails are logged to the server console until SMTP credentials are added.
 - Sessions are stored in `server/data/db.json`; delete this file to clear all users/sessions.
 - Frontend now calls the API (with cookies) for login/signup/reset and order saving; localStorage auth was removed.
+
+## Algorithmic core
+
+- Shared quote engine: `shared/quote-engine.js` exposes pricing tables, a sign-type classifier, and `computeQuote(input)` that returns `{ estimatedTotal, unitPrice, qty, category, breakdown }`. Pricing is table-driven (O(1) lookups) and normalizes pack sizes for non-phenolic stock tags. Both frontend and server consume it to avoid drift.
+- Text layout: `layoutTag({ viewBox, lines, fontFamily })` binary-searches font size against measured widths to fit within the format box (O(log n) iterations per line). The browser uses canvas measurement; Node falls back to a width heuristic.
+- Order state: `OrderStateMachine` defines `draft -> proofed -> submitted` transitions. Orders stored via `/api/orders` are normalized to this set and copied into a logbook.
+- Logbook/index: Orders are appended to `db.orderLog` and indexed in `db.orderIndex` for O(1) lookup by id; capped at 500 entries. A per-user lookup endpoint exists at `/api/order-log/:id` (auth required).

@@ -3,10 +3,206 @@
     {
       "id": "u-b96621d5b0eef517",
       "email": "thomas.cheek1@snhu.edu",
-      "passwordHash": "$2a$10$3zLJq8iHlKLmo2yXTy75auFNBhosjit0eh5xwSY3a9MIAWrVLWKtm",
+      "passwordHash": "$2a$10$NXugS9yJRdA9uw6qdGRyGONYiDYPGcS3XPrMoHXTRjEYygwLxDGYC",
       "tempPasswordHash": null,
       "requirePasswordChange": false,
-      "orders": [],
+      "orders": [
+        {
+          "id": "ord-2e3f9ca833c5113e",
+          "createdAt": "2025-12-06T06:17:28.456Z",
+          "kind": "custom",
+          "title": "Rectangle 1\" x 3\" (custom)",
+          "qty": 1,
+          "total": null,
+          "status": "proofed",
+          "summary": "PUMP 12 / 480V",
+          "config": {
+            "timestamp": "2025-12-06T06:17:28.455Z",
+            "format": {
+              "id": "rect-1x3",
+              "label": "Rectangle 1\" x 3\"",
+              "dimensions": {
+                "width": 3,
+                "height": 1
+              },
+              "shape": "rect"
+            },
+            "text": {
+              "line1": "PUMP 12",
+              "line2": "480V",
+              "font": "Inter, sans-serif",
+              "case": "upper"
+            },
+            "colors": {
+              "signType": "custom",
+              "top": "#ffffff",
+              "core": "#000000",
+              "text": "auto",
+              "outline": "none"
+            },
+            "options": {
+              "hole": "h0125",
+              "adhesive": "none",
+              "thickness": "1.6"
+            },
+            "order": {
+              "company": "ABC",
+              "contact": "Joe",
+              "email": "thomas.cheek1@snhu.edu",
+              "phone": "",
+              "quantity": 1
+            },
+            "pricing": {
+              "category": "custom",
+              "estimatedTotal": null,
+              "currency": "USD",
+              "breakdown": {}
+            },
+            "preview": {
+              "imageUsed": "assets/phenolic/Custom.png"
+            }
+          },
+          "quote": {
+            "category": "custom",
+            "qty": 1,
+            "sizeKey": null,
+            "currency": "USD",
+            "breakdown": {},
+            "estimatedTotal": null,
+            "unitPrice": null
+          }
+        },
+        {
+          "id": "ord-267217fc97a54d63",
+          "createdAt": "2025-12-06T06:17:23.654Z",
+          "kind": "custom",
+          "title": "Rectangle 1\" x 3\" (custom)",
+          "qty": 1,
+          "total": null,
+          "status": "proofed",
+          "summary": "PUMP 12 / 480V",
+          "config": {
+            "timestamp": "2025-12-06T06:17:23.643Z",
+            "format": {
+              "id": "rect-1x3",
+              "label": "Rectangle 1\" x 3\"",
+              "dimensions": {
+                "width": 3,
+                "height": 1
+              },
+              "shape": "rect"
+            },
+            "text": {
+              "line1": "PUMP 12",
+              "line2": "480V",
+              "font": "Inter, sans-serif",
+              "case": "upper"
+            },
+            "colors": {
+              "signType": "custom",
+              "top": "#ffffff",
+              "core": "#000000",
+              "text": "auto",
+              "outline": "none"
+            },
+            "options": {
+              "hole": "h0125",
+              "adhesive": "none",
+              "thickness": "1.6"
+            },
+            "order": {
+              "company": "ABC",
+              "contact": "Joe",
+              "email": "thomas.cheek1@snhu.edu",
+              "phone": "",
+              "quantity": 1
+            },
+            "pricing": {
+              "category": "custom",
+              "estimatedTotal": null,
+              "currency": "USD",
+              "breakdown": {}
+            },
+            "preview": {
+              "imageUsed": "assets/phenolic/Custom.png"
+            }
+          },
+          "quote": {
+            "category": "custom",
+            "qty": 1,
+            "sizeKey": null,
+            "currency": "USD",
+            "breakdown": {},
+            "estimatedTotal": null,
+            "unitPrice": null
+          }
+        },
+        {
+          "id": "ord-9f7cc6bb039ae094",
+          "createdAt": "2025-12-06T05:58:59.289Z",
+          "kind": "custom",
+          "title": "Rectangle 3\" x 9\" (custom)",
+          "qty": 1,
+          "total": null,
+          "status": "proofed",
+          "summary": "TEST / TEST",
+          "config": {
+            "timestamp": "2025-12-06T05:58:59.109Z",
+            "format": {
+              "id": "rect-3x9",
+              "label": "Rectangle 3\" x 9\"",
+              "dimensions": {
+                "width": 9,
+                "height": 3
+              },
+              "shape": "rect"
+            },
+            "text": {
+              "line1": "TEST",
+              "line2": "TEST",
+              "font": "Inter, sans-serif",
+              "case": "upper"
+            },
+            "colors": {
+              "signType": "custom",
+              "top": "#f5d009",
+              "core": "#ffffff",
+              "text": "#000000",
+              "outline": "thin"
+            },
+            "options": {
+              "hole": "h0125",
+              "adhesive": "467mp",
+              "thickness": "3.2"
+            },
+            "order": {
+              "company": "ABCompany",
+              "contact": "Joe",
+              "email": "thomas.cheek1@snhu.edu",
+              "phone": "",
+              "quantity": 1
+            },
+            "pricing": {
+              "category": "custom",
+              "estimatedTotal": null,
+              "currency": "USD",
+              "breakdown": {}
+            },
+            "preview": {
+              "imageUsed": "assets/phenolic/Custom.png"
+            }
+          },
+          "quote": {
+            "category": "custom",
+            "qty": 1,
+            "sizeKey": null,
+            "currency": "USD",
+            "breakdown": {},
+            "estimatedTotal": null,
+            "unitPrice": null
+          }
+        }
+      ],
       "createdAt": "2025-11-29T22:02:49.003Z",
       "company": "",
       "primaryContact": "",
@@ -14,17 +210,137 @@
       "secondaryEmail": "",
       "address1": "202 FM 2004 Rd",
       "address2": "20114",
-      "zip": "77566",
-      "city": "Lake Jackson",
-      "state": "TX",
-      "country": "United States"
+      "zip": "21150",
+      "city": "",
+      "state": "",
+      "country": "United States",
+      "deletedOrders": [
+        {
+          "id": "ord-7687ec191772d495",
+          "createdAt": "2025-11-29T23:03:20.320Z",
+          "kind": "custom",
+          "title": "Rectangle 1\" x 3\" (custom)",
+          "qty": 1,
+          "total": null,
+          "summary": "PUMP 12 / 480V",
+          "config": {
+            "timestamp": "2025-11-29T23:03:20.307Z",
+            "format": {
+              "id": "rect-1x3",
+              "label": "Rectangle 1\" x 3\"",
+              "dimensions": {
+                "width": 3,
+                "height": 1
+              },
+              "shape": "rect"
+            },
+            "text": {
+              "line1": "PUMP 12",
+              "line2": "480V",
+              "font": "Inter, sans-serif",
+              "case": "upper"
+            },
+            "colors": {
+              "signType": "custom",
+              "top": "#ffffff",
+              "core": "#000000",
+              "text": "auto",
+              "outline": "none"
+            },
+            "options": {
+              "hole": "h0125",
+              "adhesive": "none",
+              "thickness": "1.6"
+            },
+            "order": {
+              "company": "ABCompany",
+              "contact": "Dylan",
+              "email": "thomas.cheek1@snhu.edu",
+              "phone": "",
+              "quantity": 1
+            },
+            "pricing": {
+              "estimatedTotal": null,
+              "currency": "USD"
+            },
+            "preview": {
+              "imageUsed": "assets/phenolic/Custom.png"
+            }
+          },
+          "deletedAt": "2025-12-06T05:57:16.019Z"
+        }
+      ]
     }
   ],
   "sessions": [
     {
-      "token": "01cd1a66439c82f1591f1b8bbbb45a5e952e2beb5b206183",
+      "token": "51cf800a23c4662e4ced88f091c6c7d808c446ac3c245967",
       "userId": "u-b96621d5b0eef517",
-      "expiresAt": 1765058825222
+      "expiresAt": 1765062580648
     }
-  ]
+  ],
+  "orderLog": [
+    {
+      "id": "ord-2e3f9ca833c5113e",
+      "userId": "u-b96621d5b0eef517",
+      "status": "proofed",
+      "createdAt": "2025-12-06T06:17:28.456Z",
+      "title": "Rectangle 1\" x 3\" (custom)",
+      "total": null,
+      "qty": 1,
+      "kind": "custom"
+    },
+    {
+      "id": "ord-267217fc97a54d63",
+      "userId": "u-b96621d5b0eef517",
+      "status": "proofed",
+      "createdAt": "2025-12-06T06:17:23.654Z",
+      "title": "Rectangle 1\" x 3\" (custom)",
+      "total": null,
+      "qty": 1,
+      "kind": "custom"
+    },
+    {
+      "id": "ord-9f7cc6bb039ae094",
+      "userId": "u-b96621d5b0eef517",
+      "status": "proofed",
+      "createdAt": "2025-12-06T05:58:59.289Z",
+      "title": "Rectangle 3\" x 9\" (custom)",
+      "total": null,
+      "qty": 1,
+      "kind": "custom"
+    }
+  ],
+  "orderIndex": {
+    "ord-9f7cc6bb039ae094": {
+      "id": "ord-9f7cc6bb039ae094",
+      "userId": "u-b96621d5b0eef517",
+      "status": "proofed",
+      "createdAt": "2025-12-06T05:58:59.289Z",
+      "title": "Rectangle 3\" x 9\" (custom)",
+      "total": null,
+      "qty": 1,
+      "kind": "custom"
+    },
+    "ord-267217fc97a54d63": {
+      "id": "ord-267217fc97a54d63",
+      "userId": "u-b96621d5b0eef517",
+      "status": "proofed",
+      "createdAt": "2025-12-06T06:17:23.654Z",
+      "title": "Rectangle 1\" x 3\" (custom)",
+      "total": null,
+      "qty": 1,
+      "kind": "custom"
+    },
+    "ord-2e3f9ca833c5113e": {
+      "id": "ord-2e3f9ca833c5113e",
+      "userId": "u-b96621d5b0eef517",
+      "status": "proofed",
+      "createdAt": "2025-12-06T06:17:28.456Z",
+      "title": "Rectangle 1\" x 3\" (custom)",
+      "total": null,
+      "qty": 1,
+      "kind": "custom"
+    }
+  }
 }

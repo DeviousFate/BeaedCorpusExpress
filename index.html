@@ -24,22 +24,80 @@
         <ul>
           <li><span class="pill">Lead time: 10-14 business days after proof</span></li>
           <li><a class="pill" href="profile.html">User Info</a></li>
+          <li><button class="btn danger" id="topLogoutBtn" type="button" style="display:none">Sign out</button></li>
         </ul>
       </nav>
     </header>
 
     <div id="signedBanner" class="signed-banner hidden" role="status" aria-live="polite"></div>
 
-    <!-- Account & Orders -->
-    <section id="account" class="auth-section">
-      <div class="grid cols-2">
+    <!-- Hero Header -->
+    <section class="hero">
+      <div class="card preview-card">
+        <h1 class="headline">Configure engraved phenolic signs in minutes</h1>
+        <p class="sub">Pick a default format, then customize text, font, and colors. Perfect for valves, panels, and facility IDs.</p>
+        <div class="divider"></div>
+        <div class="stack">
+          <div class="title">Live Preview</div>
+          <div class="preview-wrap">
+          <!--  <svg id="tagPreview" viewBox="0 0 300 200" role="img" aria-label="Tag preview" style="width:100%;height:auto;display:block"></svg> -->
+          <!-- replaced as assets are now added -->
+            <img id="tagPreviewImg" alt="Tag preview" style="width:100%;height:auto;display:block;aspect-ratio:5/3;object-fit:contain;">
+          </div>
+          <div class="row" aria-live="polite">
+            <div class="pill">Current: <span id="currentFormatLabel" class="mono"></span></div>
+            <div class="pill">Estimate: <span class="price" id="priceEstimate">$0.00</span></div>
+          </div>
+          <div class="actions">
+            <a class="btn" id="scrollToConfig" href="#config">Customize This Format</a>
+            <button class="btn secondary" id="resetBtn" type="button">Reset</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-subgrid">
         <div class="card auth-card">
+          <div class="stack">
+            <div class="title-row">
+              <div class="title">Saved Orders</div>
+              <button type="button" class="pill" id="toggleSavedOrders">Collapse</button>
+            </div>
+            <p class="small">Orders submitted while signed in will appear here for quick reference.</p>
+            <div id="orderHistoryEmpty" class="empty-state">Sign in to view your order history.</div>
+            <div id="orderHistoryList" class="order-history"></div>
+            <div class="divider"></div>
+            <div class="title-row">
+              <div class="title">Recently Deleted (auto clears after 15 days)</div>
+              <button type="button" class="pill" id="toggleDeletedOrders">Expand</button>
+            </div>
+            <div id="orderDeletedEmpty" class="empty-state">No recently deleted orders.</div>
+            <div id="orderDeletedList" class="order-history"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="stack">
+            <div class="title">Default Formats</div>
+            <p class="small">Choose a base size to start; customize everything else below.</p>
+            <div class="grid cols-3 formats" id="formatGrid" aria-label="Default Formats">
+              
+              <!-- Cards injected by JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Account Access -->
+    <section id="account" class="auth-section">
+      <div class="grid cols-1">
+        <div class="card auth-card" id="accountAccessCard">
           <div class="stack">
             <div class="title">Account Access</div>
             <p class="small">Sign in to save and revisit quote requests. Orders placed while signed in will be tied to your account.</p>
             <div class="auth-topline">
               <div id="authStatus" class="pill">Signed out</div>
-              <button class="btn secondary" id="logoutBtn" type="button" style="display:none">Sign out</button>
+              <button class="btn danger" id="logoutBtn" type="button" style="display:none">Sign out</button>
             </div>
             <div class="auth-tabs" role="tablist" aria-label="Account actions">
               <button type="button" class="auth-tab active" data-panel="loginPanel" role="tab" aria-controls="loginPanel">Sign In</button>
@@ -98,46 +156,6 @@
             </div>
 
             <div id="authMessage" class="message" style="display:none"></div>
-          </div>
-        </div>
-
-        <div class="card auth-card">
-          <div class="stack">
-            <div class="title">Saved Orders</div>
-            <p class="small">Orders submitted while signed in will appear here for quick reference.</p>
-            <div id="orderHistoryEmpty" class="empty-state">Sign in to view your order history.</div>
-            <div id="orderHistoryList" class="order-history"></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Hero Header -->
-    <section class="hero">
-      <div class="card">
-        <h1 class="headline">Configure engraved phenolic signs in minutes</h1>
-        <p class="sub">Pick a default format, then customize text, font, and colors. Perfect for valves, panels, and facility IDs.</p>
-        <div class="divider"></div>
-        <div class="grid cols-3 formats" id="formatGrid" aria-label="Default Formats">
-          
-          <!-- Cards injected by JS -->
-        </div>
-      </div>
-      <div class="card">
-        <div class="stack">
-          <div class="title">Live Preview</div>
-          <div class="preview-wrap">
-          <!--  <svg id="tagPreview" viewBox="0 0 300 200" role="img" aria-label="Tag preview" style="width:100%;height:auto;display:block"></svg> -->
-          <!-- replaced as assets are now added -->
-            <img id="tagPreviewImg" alt="Tag preview" style="width:100%;height:auto;display:block;aspect-ratio:5/3;object-fit:contain;">
-          </div>
-          <div class="row" aria-live="polite">
-            <div class="pill">Current: <span id="currentFormatLabel" class="mono"></span></div>
-            <div class="pill">Estimate: <span class="price" id="priceEstimate">$0.00</span></div>
-          </div>
-          <div class="actions">
-            <a class="btn" id="scrollToConfig" href="#config">Customize This Format</a>
-            <button class="btn secondary" id="resetBtn" type="button">Reset</button>
           </div>
         </div>
       </div>
@@ -359,6 +377,7 @@
     <p class="footer">(c) <span id="year"></span> Acme Industrial Tags. Custom items are non-returnable; defects replaced per policy.</p>
   </div>
 
+  <script src="shared/quote-engine.js"></script>
   <script src="js/site.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
