@@ -52,7 +52,7 @@ A lightweight Node/Express API now backs authentication and order history.
   - `GET /api/orders` - list orders for the signed-in user
   - `POST /api/orders` - `{ order }` to save custom/stock orders
 
-### Run locally
+### Run locally (because I sometimes forget when running locally. Don't judge.)
 
 ```bash
 npm install
